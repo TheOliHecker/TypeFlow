@@ -43,7 +43,8 @@ pnpm start
 - Start, pause, resume, stop, reset, progress, elapsed/remaining time, current pace, correction highlighting, and automatically scrolling preview.
 - Completed-session replay at 0.5×, 1×, 2×, 4×, or 8×, replay pause/resume/reset, paginated event inspection, and automated-session JSON exports.
 - Completed TXT and DOCX downloads with paragraph breaks, plus clipboard copy. DOCX includes an automation disclosure in document metadata; TXT preserves the supplied text exactly without adding a footer.
-- Local draft, settings, theme, and small last-session metadata persistence. Incomplete sessions are detected after a refresh; the draft can start a new simulation.
+- Local draft/settings/theme persistence, versioned session checkpoints, and paused recovery after interruption. Inspect or discard saved progress in the workspace; storage errors are visible.
+- Cross-tab execution ownership, emergency stop/cancel, and live WPM/pause/word-safe typo adjustments with independent Type 1/Type 2 settings.
 - Future Google Docs integration contracts and architecture, without OAuth or external writes.
 
 ## Quality checks
@@ -65,7 +66,9 @@ src/app/                    App Router routes, metadata, design system
 src/components/             Landing demo, draft workspace, settings, results
 src/lib/types.ts             Shared settings, limits, text/time helpers
 src/lib/use-draft.ts         Validated, debounced browser persistence
-src/lib/use-session-metadata.ts  Small session summaries and refresh recovery
+src/lib/simulation/session.ts Versioned checkpoints and browser storage
+src/lib/simulation/adapters.ts Capabilities, receipts and external reconciliation
+src/lib/simulation/scheduler.ts Foreground wakes and future host ports
 src/lib/simulation/plan.ts   Seeded, deterministic simulation schedule
 src/lib/simulation/index.ts  Portable core exports (no React or DOM)
 src/lib/simulation/settings.ts Settings defaults, merging and validation
@@ -81,7 +84,7 @@ src/lib/export.ts           TXT, lazy-loaded DOCX, and JSON downloads
 src/lib/integrations/       Future Google Docs contracts only
 ```
 
-The engine uses a monotonic clock and planned event deadlines. It compares each callback with active elapsed time rather than counting timer invocations. Pausing freezes active time. One timer per engine prevents overlap; UI snapshots are limited to approximately 25 per second. Delayed callbacks process at most 1,000 events each, giving the browser time to respond between batches. Typing and backspacing use grapheme boundaries, with explicit UTF-16 edit positions for integration compatibility. The portable engine preserves the supplied final text exactly, including line endings, unless a proofreading suggestion was explicitly approved. The website normalizes pasted Windows line endings in its editor.
+The engine uses absolute wake deadlines and pause-adjusted active elapsed time. It compares each callback with active elapsed time rather than counting timer invocations. Pausing freezes active time. One timer per engine prevents overlap; UI snapshots are limited to approximately 25 per second. Delayed callbacks process at most 1,000 events each, giving the browser time to respond between batches. Typing and backspacing use grapheme boundaries, with explicit UTF-16 edit positions for integration compatibility. The portable engine preserves the supplied final text exactly, including line endings, unless a proofreading suggestion was explicitly approved. The website normalizes pasted Windows line endings in its editor.
 
 New sessions use schema version 3 (adding checked replacement/verification events and speed metrics); legacy positionless events still replay. `index` and `deleteCount` are UTF-16 offsets in the document immediately before an event. `source` is the approved final output; `initialSource` and `options` retain the supplied drafts/settings. Events identify draft, revision and proofreading stages, and distinguish temporary `correction` events from approved wording edits. The event log has a versioned schema and records actual wall-clock timestamps, actual wall elapsed offsets (including user pauses), active elapsed time, and planned deadlines. Replay uses the recorded wall elapsed offsets, so it also reproduces delays and pauses. It never reruns the random simulation plan. A seeded planner makes the duration estimate and the execution schedule agree.
 
@@ -109,7 +112,7 @@ See [docs/GOOGLE_DOCS.md](docs/GOOGLE_DOCS.md) for authorization, scope choices,
 - Documents are limited to 100,000 UTF-16 characters (matching textarea length semantics). Source emoji/Unicode are preserved; complete grapheme clusters are typed and deleted together.
 - WPM uses the conventional five characters per word. Natural variation can momentarily be faster/slower than the selected base pace. Thinking pauses add time. The word counter counts whitespace-separated groups; it is not a language-aware tokenizer.
 - Browser throttling, device sleep, or a busy main thread can delay completion beyond the estimate or target. Overdue events catch up in bounded batches and retain actual execution timestamps.
-- Full event logs/replays are in memory until navigation, refresh, reset, editing the source/title, or starting another simulation. Export JSON before leaving if you want a permanent record. Importing old logs is not part of this MVP.
+- Incomplete sessions can restore confirmed progress and actual audit timestamps from checkpoints. Completed logs/replay remain in memory; export JSON for permanent records. Recovery is limited by browser storage (3 MB serialized checkpoints); failures are visible. Importing arbitrary old logs remains unsupported.
 - Stop retains the partial preview; downloads and replay are available for completed sessions. Reset clears the session and preserves the draft/settings.
 - No cross-device sync, authentication, backend, or Google Docs connection exists in this version. LocalStorage is not encrypted. Avoid storing private text on a shared device.
 - Theme follows the device preference on first visit, then remembers the explicitly selected theme.
@@ -132,4 +135,8 @@ Smart revisions align paragraphs and sentences with bounded exact-anchor searche
 
 Type 1 and Type 2 retain independent settings, including 20–300 base WPM, pause ranges, weighted mistakes and correction timing. Speeds above typical presets are labeled accelerated automation. Base WPM uses five grapheme characters per word; effective Type 1 WPM includes its pauses and corrections. Overall recorded duration includes revisions and user pauses. Defaults are simulation choices, not scientifically universal typing probabilities. Selection replacement is atomic; insertion-based rewrites render progressively.
 
-Limitations: sentence segmentation uses the runtime's English `Intl.Segmenter`; alignment is heuristic with 64-unit lookahead and does not guarantee the globally smallest edit script. Source Unicode is preserved, while keyboard-generated mistakes currently target Latin ASCII words. Schedules and logs are held in memory, bounded by the 100,000-character input limits; they are not streaming cloud execution. Existing schema 1/2 replay remains supported. No OAuth, extension, network adapter, deployment or new dependency is included.
+Limitations: sentence segmentation uses the runtime's English `Intl.Segmenter`; alignment is heuristic with 64-unit lookahead and does not guarantee the globally smallest edit script. Source Unicode is preserved, while keyboard-generated mistakes currently target Latin ASCII words. Plans and logs execute in memory, bounded by the 100,000-character input limits; unfinished sessions also have size-limited local checkpoints. Streaming cloud execution is not implemented. Existing schema 1/2 replay remains supported. No OAuth, extension, network adapter, deployment or new dependency is included.
+
+## Phase 2 Part 2B
+
+See [Editing execution and local recovery](docs/SESSIONS.md) for lifecycle, checkpoint format, scheduler ports, adapter capabilities, uncertain-write reconciliation, UTF-16 positions and future extension/Google Docs integration. Foreground scheduling and local checkpoint recovery are implemented. Extension/cloud execution and Google Docs synchronization remain contracts only.

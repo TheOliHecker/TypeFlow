@@ -54,3 +54,12 @@ Downloaded a completed session with `Hello 🌿.\n\nA fresh start.` as its sourc
 ## Scope of verification
 
 This is local verification in one browser environment, plus injected-clock automated tests. Other browser engines, assistive technologies, Vercel hosting, and live Google Docs calls were not tested. Google OAuth and remote editing are intentionally unimplemented. Full event logs are not persisted after refresh/navigation; this is disclosed in the UI and README.
+
+## Phase 2 Part 2B — October 30, 2026
+
+- Verified `c79c010` and continued on `codex/google-docs-integration` from a clean tree.
+- TypeScript (`pnpm typecheck`) and ESLint (`pnpm lint`) passed.
+- One production webpack build (`pnpm exec next build --webpack`) passed, including static generation for `/` and `/workspace`.
+- Existing engine/revision tests passed alongside the first six recovery tests (29 tests). The final focused recovery file passed all eight tests after adding timeout/capability checks. No full-suite loops or extensive browser automation were run.
+- Focused coverage: persisted revision recovery with exact audit timestamps and approved Unicode output; pause/resume and emergency-stop timer cancellation; lost acknowledgements and duplicate prevention across executor restarts; late remote completion after stop; future-only live settings; incompatible/corrupt checkpoints and storage failure; unsafe UTF-16 ranges; uncertain timeout retries without revision tokens; unsupported adapter operations.
+- No OAuth, Chrome extension, external writes, deployment, paid service or main merge was performed. Browser scheduling remains subject to tab throttling, closure and device sleep. External adapters/journal storage and extension/server hosts require integration before remote/background execution is available.

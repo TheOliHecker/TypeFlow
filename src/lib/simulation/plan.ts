@@ -16,9 +16,18 @@ import { approvedText } from "./proofreading";
 
 export type Stage = "draft" | "revision" | "proofreading";
 export type PlanEvent = {
+  /** Stable within a session, including when future words are regenerated. */
+  id?: number | string;
   scheduledMs: number;
   type: "insert" | "delete" | "thinking" | "stage" | "replace" | "verify";
   text?: string;
+  typingUnit?: {
+    text: string;
+    index: number;
+    count: number;
+    sourceIndex: number;
+    typos: SimulationSettings["typos"];
+  };
   expected?: string;
   operation?: string;
   sourceIndex: number;
@@ -186,6 +195,8 @@ export function createPlan(
     previousWord = word;
   }
   for (const token of tokens) {
+    const unitStart = events.length,
+      unitSource = sourceIndex;
     const chance = a.typoProbability ?? intensity[settings.typos] * 0.08;
     const mistake =
       settings.typos !== "off" && random() < chance ? typo(token) : null;
@@ -252,6 +263,19 @@ export function createPlan(
       const pause = boundaryPause(token, settings, a, random);
       if (pause) emit({ type: "thinking" }, pause);
     }
+    if (
+      events.length > unitStart &&
+      token.trim() &&
+      token.length <= 256 &&
+      (a.correctionTiming === "word" || a.correctionTiming === "immediate")
+    )
+      events[unitStart].typingUnit = {
+        text: token,
+        index: at,
+        count: events.length - unitStart,
+        sourceIndex: unitSource,
+        typos: settings.typos,
+      };
   }
   if (pending.length) {
     if (a.correctionTiming === "proofreading") transition("proofreading");
@@ -399,6 +423,13 @@ export function createPlan(
               deleteCount: event.deleteCount,
               correction: event.correction,
               typoCategory: event.typoCategory,
+              typingUnit: event.typingUnit
+                ? {
+                    ...event.typingUnit,
+                    index: event.typingUnit.index + insertionIndex,
+                    sourceIndex,
+                  }
+                : undefined,
             },
             editDelay,
           );

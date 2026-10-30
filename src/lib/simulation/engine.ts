@@ -1,4 +1,7 @@
 import { applyOperation } from "./operations";
+import type { SessionCheckpoint } from "./session";
+import { validateSettings, intensity } from "./settings";
+import { ForegroundScheduler } from "./scheduler";
 import { type SimulationSettings } from "../types";
 import {
   createPlan,
@@ -56,6 +59,12 @@ export type Snapshot = {
   editIndex?: number;
   operation?: string;
   error?: string;
+  storageError?: string;
+  recoveryStatus?:
+    | "recovering"
+    | "synchronizing"
+    | "interrupted"
+    | "requires attention";
 };
 export const IDLE_SNAPSHOT: Snapshot = {
   status: "idle",
@@ -77,12 +86,15 @@ export type Clock = {
   set: (fn: () => void, delay: number) => ReturnType<typeof setTimeout>;
   clear: (id: ReturnType<typeof setTimeout>) => void;
 };
-const browserClock: Clock = {
-  now: () => performance.now(),
-  date: () => new Date(),
-  set: (fn, delay) => setTimeout(fn, delay),
-  clear: (id) => clearTimeout(id),
-};
+function browserClock(): Clock {
+  const scheduler = new ForegroundScheduler();
+  return {
+    now: scheduler.now,
+    date: () => new Date(scheduler.now()),
+    set: (fn, delay) => scheduler.schedule(scheduler.now() + delay, fn),
+    clear: () => scheduler.cancel(),
+  };
+}
 
 export function applyEvent(
   text: string,
@@ -115,7 +127,7 @@ export function applyEvent(
   return text;
 }
 
-/** One owner, one timer. Processes deadlines against a monotonic active clock. */
+/** One owner, one timer. Processes deadlines against absolute deadlines and a pause-adjusted active clock. */
 export class SimulationEngine {
   private snapshot: Snapshot = { ...IDLE_SNAPSHOT };
   private plan: SimulationPlan | null = null;
@@ -126,7 +138,165 @@ export class SimulationEngine {
   private accumulated = 0;
   private index = 0;
   private listeners = new Set<() => void>();
-  constructor(private clock: Clock = browserClock) {}
+  private checkpointWriter?: (checkpoint: SessionCheckpoint) => void;
+  private checkpointAt = 0;
+  private audit: SessionCheckpoint["audit"] = [];
+  setCheckpointWriter(writer?: (checkpoint: SessionCheckpoint) => void) {
+    this.checkpointWriter = writer;
+  }
+  checkpoint = () => {
+    if (!this.plan || !this.log || !this.checkpointWriter) return;
+    const now = this.clock.date().getTime();
+    const previousError = this.snapshot.storageError;
+    const { events: _events, ...log } = this.log;
+    void _events;
+    try {
+      this.checkpointWriter({
+        schemaVersion: 1,
+        id: log.id,
+        mode: log.options?.finalText !== undefined ? "two" : "single",
+        stage: this.snapshot.stage,
+        plan: this.plan,
+        operationIndex: this.index,
+        lastCompletedOperation: this.index
+          ? `${log.id}:${this.plan.events[this.index - 1].id ?? this.index - 1}`
+          : null,
+        snapshot: { ...this.snapshot },
+        log,
+        audit: this.audit,
+        checkpointAt: now,
+        simulationStartedAt: Date.parse(log.startedAt),
+        lastActivityAt: Date.parse(
+          this.log.events.at(-1)?.timestamp ?? log.startedAt,
+        ),
+        nextScheduledAt:
+          this.snapshot.status === "running" && this.plan.events[this.index]
+            ? now +
+              Math.max(
+                0,
+                this.plan.events[this.index].scheduledMs - this.activeTime(),
+              )
+            : null,
+        accumulatedMs: this.activeTime(),
+        sync: "confirmed",
+        recovery:
+          this.snapshot.status === "completed"
+            ? "complete"
+            : this.snapshot.status === "paused"
+              ? "paused"
+              : this.snapshot.status === "stopped"
+                ? "stopped"
+                : "interrupted",
+      });
+      this.checkpointAt = now;
+      if (this.snapshot.storageError)
+        this.snapshot = { ...this.snapshot, storageError: undefined };
+    } catch (error) {
+      this.snapshot = {
+        ...this.snapshot,
+        storageError: (error as Error).message,
+      };
+    }
+    if (previousError !== this.snapshot.storageError) this.notify();
+  };
+  recover(saved: SessionCheckpoint) {
+    if (this.snapshot.status === "running" || this.snapshot.status === "paused")
+      throw new Error("Stop the current session before recovering.");
+    this.cancel();
+    this.plan = structuredClone(saved.plan);
+    this.index = saved.operationIndex;
+    this.audit = structuredClone(saved.audit);
+    this.log = {
+      ...structuredClone(saved.log),
+      events: this.audit.map((entry) => ({
+        ...(entry.planIndex !== undefined
+          ? this.plan!.events[entry.planIndex]
+          : { type: entry.type!, sourceIndex: 0 }),
+        atMs: entry.atMs,
+        activeMs: entry.activeMs,
+        timestamp: entry.timestamp,
+      })),
+    };
+    this.accumulated = saved.accumulatedMs;
+    this.origin =
+      this.clock.now() -
+      (this.clock.date().getTime() - saved.simulationStartedAt);
+    this.activeOrigin = this.clock.now();
+    // Reopen the confirmed local document; offline time is not fabricated typing.
+    this.snapshot = {
+      ...saved.snapshot,
+      status: "paused",
+      currentWpm: 0,
+      recoveryStatus: "interrupted",
+      storageError: undefined,
+    };
+    this.checkpoint();
+    this.notify();
+  }
+  emergencyStop() {
+    this.stop();
+  }
+  cancelSession() {
+    this.stop();
+    this.reset();
+  }
+  updateLiveSettings(
+    stage: "draft" | "revision",
+    settings: SimulationSettings,
+  ) {
+    validateSettings(settings);
+    if (!this.plan || !this.log) return;
+    const old =
+      stage === "draft"
+        ? this.log.settings
+        : (this.log.options?.finalSettings ?? this.log.settings);
+    let previous = this.plan.events[this.index - 1]?.scheduledMs ?? 0;
+    let nextTime = Math.max(previous, this.activeTime());
+    for (let i = this.index; i < this.plan.events.length; i++) {
+      const event = this.plan.events[i];
+      let gap = event.scheduledMs - previous;
+      previous = event.scheduledMs;
+      const matches = event.stage === stage;
+      const ratio =
+        event.type === "thinking"
+          ? intensity[settings.pauses] / Math.max(1, intensity[old.pauses])
+          : old.wpm / settings.wpm;
+      if (
+        matches &&
+        old.pauses === "off" &&
+        settings.pauses !== "off" &&
+        this.plan.events[i - 1]?.type === "insert" &&
+        /[.!?\n]/u.test(this.plan.events[i - 1].text ?? "")
+      )
+        gap += 300 * intensity[settings.pauses];
+      nextTime += gap * (matches ? ratio : 1);
+      if (matches && event.typingMs !== undefined)
+        event.typingMs *= old.wpm / settings.wpm;
+      event.scheduledMs = nextTime;
+    }
+    this.plan.durationMs = nextTime;
+    if (old.typos !== settings.typos) this.refreshTypingUnits(stage, settings);
+    if (stage === "draft") this.log.settings = structuredClone(settings);
+    else
+      this.log.options = {
+        ...this.log.options,
+        finalSettings: structuredClone(settings),
+      };
+    this.snapshot = {
+      ...this.snapshot,
+      remainingMs: Math.max(0, this.plan.durationMs - this.activeTime()),
+    };
+    if (this.log.metrics) {
+      this.log.metrics.durationMs = this.plan.durationMs;
+      this.log.metrics.effectiveWpm =
+        this.plan.source.length / 5 / (this.plan.durationMs / 60000);
+      if (stage === "draft") this.log.metrics.baseWpm = settings.wpm;
+      else this.log.metrics.revisionBaseWpm = settings.wpm;
+    }
+    this.checkpoint();
+    this.notify();
+  }
+  constructor(private clock: Clock = browserClock()) {}
   getSnapshot = () => this.snapshot;
   subscribe = (listener: () => void) => {
     this.listeners.add(listener);
@@ -165,6 +335,21 @@ export class SimulationEngine {
   private record(
     event: Omit<SimulationEvent, "atMs" | "activeMs" | "timestamp">,
   ) {
+    this.audit.push({
+      ...(this.plan?.events[this.index - 1] === event
+        ? { planIndex: this.index - 1 }
+        : {
+            type: event.type as
+              | "start"
+              | "pause"
+              | "resume"
+              | "stop"
+              | "complete",
+          }),
+      atMs: this.clock.now() - this.origin,
+      activeMs: this.activeTime(),
+      timestamp: this.clock.date().toISOString(),
+    });
     this.log?.events.push({
       ...event,
       atMs: this.clock.now() - this.origin,
@@ -183,7 +368,11 @@ export class SimulationEngine {
     const plan = createPlan(text, settings, undefined, options);
     this.cancel();
     this.plan = plan;
+    plan.events.forEach((event, index) => {
+      event.id = index;
+    });
     this.index = 0;
+    this.audit = [];
     this.accumulated = 0;
     this.origin = this.activeOrigin = this.clock.now();
     const startedAt = this.clock.date().toISOString();
@@ -217,6 +406,7 @@ export class SimulationEngine {
       currentWpm: plan.baseWpm,
     };
     this.record({ type: "start", sourceIndex: 0 });
+    this.checkpoint();
     this.notify();
     this.schedule();
     return true;
@@ -224,7 +414,73 @@ export class SimulationEngine {
   private schedule() {
     this.cancel();
     if (this.snapshot.status === "running")
-      this.timer = this.clock.set(this.tick, 40);
+      this.timer = this.clock.set(
+        this.tick,
+        Math.max(
+          1,
+          Math.min(
+            250,
+            (this.plan?.events[this.index]?.scheduledMs ??
+              this.activeTime() + 250) - this.activeTime(),
+          ),
+        ),
+      );
+  }
+  private refreshTypingUnits(
+    stage: "draft" | "revision",
+    settings: SimulationSettings,
+  ) {
+    if (!this.plan) return;
+    const result = this.plan.events.slice(0, this.index);
+    let shift = 0;
+    for (let i = this.index; i < this.plan.events.length; ) {
+      const event = this.plan.events[i],
+        unit = event.typingUnit;
+      if (!unit || event.stage !== stage || unit.typos === settings.typos) {
+        event.scheduledMs += shift;
+        result.push(event);
+        i++;
+        continue;
+      }
+      // Only untouched, self-contained words are regenerated; active correction
+      // groups and sentence/proofreading deferred slips retain their original plan.
+      const replacement = createPlan(unit.text, {
+        ...settings,
+        durationSeconds: null,
+      });
+      const from = result.at(-1)?.scheduledMs ?? 0;
+      const oldEnd = this.plan.events[i + unit.count - 1].scheduledMs;
+      const replacementEvents = replacement.events.filter(
+        (e) => e.type !== "verify" && e.type !== "stage",
+      );
+      const groupId = crypto.randomUUID();
+      replacementEvents.forEach((e, n) =>
+        result.push({
+          ...e,
+          id: `${groupId}:${n}`,
+          scheduledMs: from + e.scheduledMs,
+          stage: event.stage,
+          sourceIndex:
+            stage === "revision"
+              ? event.sourceIndex
+              : unit.sourceIndex + e.sourceIndex,
+          index: e.index === undefined ? undefined : unit.index + e.index,
+          operation: event.operation,
+          typingUnit:
+            n === 0
+              ? {
+                  ...unit,
+                  count: replacementEvents.length,
+                  typos: settings.typos,
+                }
+              : undefined,
+        }),
+      );
+      shift = (result.at(-1)?.scheduledMs ?? from) - oldEnd;
+      i += unit.count;
+    }
+    this.plan.events = result;
+    this.plan.durationMs += shift;
   }
   private tick = () => {
     if (this.snapshot.status !== "running" || !this.plan) return;
@@ -243,7 +499,7 @@ export class SimulationEngine {
       this.plan.events[this.index].scheduledMs <= elapsedMs &&
       processed < 1000
     ) {
-      const event = this.plan.events[this.index++];
+      const event = this.plan.events[this.index];
       try {
         text = applyEvent(text, event);
       } catch (error) {
@@ -254,9 +510,11 @@ export class SimulationEngine {
           status: "error",
           error: (error as Error).message,
         };
+        this.checkpoint();
         this.notify();
         return;
       }
+      this.index++;
       operation = event.operation ?? operation;
       sourceIndex = event.sourceIndex;
       stage = event.stage ?? stage;
@@ -318,11 +576,14 @@ export class SimulationEngine {
       this.log!.completedAt = this.clock.date().toISOString();
       this.cancel();
     } else this.schedule();
+    if (
+      this.snapshot.status === "completed" ||
+      this.clock.date().getTime() - this.checkpointAt >= 5000
+    )
+      this.checkpoint();
     this.notify();
   };
   pause() {
-    if (this.snapshot.status !== "running") return;
-    this.tick();
     if (this.snapshot.status !== "running") return;
     this.accumulated = this.activeTime();
     this.snapshot = {
@@ -333,13 +594,19 @@ export class SimulationEngine {
     };
     this.cancel();
     this.record({ type: "pause", sourceIndex: this.snapshot.sourceIndex });
+    this.checkpoint();
     this.notify();
   }
   resume() {
     if (this.snapshot.status !== "paused") return;
     this.activeOrigin = this.clock.now();
-    this.snapshot = { ...this.snapshot, status: "running" };
+    this.snapshot = {
+      ...this.snapshot,
+      status: "running",
+      recoveryStatus: undefined,
+    };
     this.record({ type: "resume", sourceIndex: this.snapshot.sourceIndex });
+    this.checkpoint();
     this.notify();
     this.schedule();
   }
@@ -355,6 +622,7 @@ export class SimulationEngine {
     };
     this.cancel();
     this.record({ type: "stop", sourceIndex: this.snapshot.sourceIndex });
+    this.checkpoint();
     this.notify();
   }
   reset() {

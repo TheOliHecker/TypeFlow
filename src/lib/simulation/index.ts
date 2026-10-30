@@ -34,3 +34,27 @@ export {
   type SimulationSettings,
   type AdvancedSettings,
 } from "../types";
+export {
+  PreviewAdapter,
+  AdapterExecutor,
+  type DocumentAdapter,
+  type AdapterCapabilities,
+  type DocumentState,
+  type WriteAhead,
+  type OperationJournal,
+  type OperationState,
+} from "./adapters";
+export {
+  BrowserSessionStorage,
+  decodeCheckpoint,
+  type SessionCheckpoint,
+  type SessionStorage,
+  type ChromeStoragePort,
+} from "./session";
+export {
+  ForegroundScheduler,
+  eligibleOperations,
+  type Scheduler,
+  type ExtensionWakePort,
+  type ServerWakePort,
+} from "./scheduler";

@@ -33,7 +33,6 @@ import {
 import { useSimulation } from "@/lib/simulation/use-simulation";
 import { createPlan } from "@/lib/simulation/plan";
 import { SessionResults } from "./session-results";
-import { useSessionMetadata } from "@/lib/use-session-metadata";
 
 export function Workspace() {
   const { draft, loaded, storageError, saving, update } = useDraft();
@@ -60,8 +59,16 @@ export function Workspace() {
     }),
     [twoTexts, finalText, finalSettings, draft.revisionMode, proofreading],
   );
-  const { engine, snapshot } = useSimulation();
-  const previous = useSessionMetadata(engine);
+  const {
+    engine,
+    snapshot,
+    recoverable,
+    recoveryError,
+    exclusive,
+    recover,
+    discard,
+    cancelSession,
+  } = useSimulation();
   const [error, setError] = useState("");
   const paper = useRef<HTMLDivElement>(null);
   const cursor = useRef<HTMLSpanElement>(null);
@@ -120,10 +127,13 @@ export function Workspace() {
           : (snapshot.operation ?? "In the flow")
       : {
           idle: "Ready when you are",
-          paused: "Taking a little pause",
+          paused:
+            snapshot.recoveryStatus === "interrupted"
+              ? "Interrupted session restored · paused"
+              : "Paused",
           stopped: "Session stopped",
-          completed: "All your words, in place",
-          error: snapshot.error ?? "Document verification failed",
+          completed: "Complete · All your words, in place",
+          error: `Requires attention · ${snapshot.error ?? "Document verification failed"}`,
         }[snapshot.status];
   useEffect(() => {
     if (snapshot.status === "running")
@@ -132,7 +142,9 @@ export function Workspace() {
   const start = () => {
     setError("");
     try {
-      engine.start(text, settings, title || "Untitled document", options);
+      void exclusive(() =>
+        engine.start(text, settings, title || "Untitled document", options),
+      );
     } catch (e) {
       setError((e as Error).message);
     }
@@ -179,14 +191,67 @@ export function Workspace() {
             {error}
           </p>
         )}
-        {previous && snapshot.status === "idle" && (
-          <p className="restore-note">
-            {previous.status === "running" || previous.status === "paused"
-              ? "Your previous session was interrupted. Your draft is restored; start a new session when you’re ready."
-              : `Last session: ${previous.title.slice(0, 120)} · ${previous.status}. Your draft is restored.`}{" "}
-            Full replay logs are available only until you leave this page.
-          </p>
+        {(recoveryError || snapshot.storageError) && (
+          <div className="session-error" role="alert">
+            {recoveryError || snapshot.storageError}
+            {!active && (
+              <button className="button" onClick={() => discard()}>
+                Discard saved checkpoints
+              </button>
+            )}
+          </div>
         )}
+        {!active &&
+          recoverable.map((saved) => (
+            <section className="restore-note" key={saved.id}>
+              <p>
+                <strong>{saved.log.title}</strong> · {saved.stage} ·{" "}
+                {saved.recovery} · {Math.floor(saved.snapshot.progress)}%
+              </p>
+              <p>
+                Last saved {new Date(saved.checkpointAt).toLocaleString()}.
+                Recovery restores confirmed progress, paused.
+              </p>
+              <button
+                className="button"
+                onClick={() =>
+                  void recover(saved.id, (checkpoint) =>
+                    update({
+                      title: checkpoint.log.title,
+                      text: checkpoint.plan.initialSource,
+                      mode: checkpoint.mode,
+                      settings: checkpoint.log.settings,
+                      finalText: checkpoint.log.options?.finalText,
+                      finalSettings: checkpoint.log.options?.finalSettings,
+                      proofreading: checkpoint.log.options?.proofreading,
+                      revisionMode: checkpoint.log.options?.revisionMode,
+                    }),
+                  )
+                }
+              >
+                Resume saved session
+              </button>{" "}
+              <button className="button" onClick={() => discard(saved.id)}>
+                Discard session
+              </button>
+              <details>
+                <summary>Inspect saved progress</summary>
+                <p>
+                  {saved.operationIndex} confirmed operations · last confirmed{" "}
+                  {saved.lastCompletedOperation ?? "none"}
+                </p>
+                <pre
+                  style={{
+                    whiteSpace: "pre-wrap",
+                    maxHeight: 200,
+                    overflow: "auto",
+                  }}
+                >
+                  {saved.snapshot.text}
+                </pre>
+              </details>
+            </section>
+          ))}
         <div className="workspace-grid">
           <div className="workspace-editor-column">
             <section className="settings-panel mode-panel">
@@ -277,10 +342,12 @@ export function Workspace() {
             </section>
             <SettingsPanel
               settings={settings}
-              disabled={active || !loaded}
+              disabled={!loaded}
+              live={active}
               label={twoTexts ? "Type 1 · Writing settings" : "Your rhythm"}
               onChange={(settings) => {
-                engine.reset();
+                if (active) engine.updateLiveSettings("draft", settings);
+                else engine.reset();
                 update({ settings });
               }}
               estimateMs={firstEstimate.ms}
@@ -350,9 +417,12 @@ export function Workspace() {
                     update({ revisionMode });
                   }}
                   settings={finalSettings}
-                  disabled={active || !loaded}
+                  disabled={!loaded}
+                  live={active}
                   onChange={(finalSettings) => {
-                    engine.reset();
+                    if (active)
+                      engine.updateLiveSettings("revision", finalSettings);
+                    else engine.reset();
                     update({ finalSettings });
                   }}
                   estimateMs={secondEstimate.ms}
@@ -455,6 +525,19 @@ export function Workspace() {
                   </button>
                 )}
                 {active && (
+                  <>
+                    <button
+                      className="button"
+                      onClick={() => engine.emergencyStop()}
+                    >
+                      Emergency stop
+                    </button>
+                    <button className="button" onClick={cancelSession}>
+                      Cancel
+                    </button>
+                  </>
+                )}
+                {active && (
                   <button
                     className="icon-button"
                     aria-label="Stop session"
@@ -470,7 +553,7 @@ export function Workspace() {
                   title="Reset session"
                   disabled={snapshot.status === "idle"}
                   onClick={() => {
-                    engine.reset();
+                    cancelSession();
                     setError("");
                   }}
                 >
@@ -489,6 +572,12 @@ export function Workspace() {
                 {estimate.error}
               </p>
             )}
+            <p className="setting-hint">
+              Local foreground scheduling: background tabs may throttle
+              execution. Closed tabs and sleeping devices cannot execute. Stop
+              keeps a recoverable checkpoint; Cancel discards this session and
+              its checkpoint.
+            </p>
             <section className="session-panel">
               <div className="session-progress-heading">
                 <span>Session progress</span>
