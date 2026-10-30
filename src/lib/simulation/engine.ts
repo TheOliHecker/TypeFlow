@@ -306,6 +306,18 @@ export class SimulationEngine {
   };
   getLog = (): SessionLog | null =>
     this.log ? structuredClone(this.log) : null;
+  getOutputProgress = () => ({ index: this.index, sessionId: this.log?.id });
+  /** Host synchronization consumes only operations already executed locally. */
+  getOutputCheckpoint = () =>
+    this.plan && this.log
+      ? {
+          sessionId: this.log.id,
+          index: this.index,
+          events: this.plan.events.slice(0, this.index),
+          target: this.plan.source,
+          snapshot: this.snapshot,
+        }
+      : null;
   getMetadata = () =>
     this.log
       ? {

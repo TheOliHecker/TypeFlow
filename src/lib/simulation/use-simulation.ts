@@ -9,6 +9,11 @@ import {
 import { IDLE_SNAPSHOT, SimulationEngine } from "./engine";
 import { BrowserSessionStorage, type SessionCheckpoint } from "./session";
 
+function needsRecovery(s: SessionCheckpoint) {
+  if (s.recovery !== "complete") return true;
+  const binding = localStorage.getItem(`typeflow-google-v1:${s.id}`);
+  return !!binding && !JSON.parse(binding).complete;
+}
 export function useSimulation() {
   const [engine] = useState(() => new SimulationEngine());
   const [recoverable, setRecoverable] = useReducer(
@@ -31,14 +36,18 @@ export function useSimulation() {
     let store: BrowserSessionStorage;
     try {
       store = new BrowserSessionStorage(localStorage);
-      setRecoverable(store.list().filter((s) => s.recovery !== "complete"));
+      setRecoverable(store.list().filter(needsRecovery));
       if (store.issues.length)
         setRecoveryError(
           `${store.issues.length} saved checkpoint(s) require attention: ${store.issues[0].error}`,
         );
       engine.setCheckpointWriter((s) => {
         store.save(s);
-        if (s.recovery === "complete") store.delete(s.id);
+        if (
+          s.recovery === "complete" &&
+          !localStorage.getItem(`typeflow-google-v1:${s.id}`)
+        )
+          store.delete(s.id);
       });
     } catch (error) {
       setRecoveryError((error as Error).message);
@@ -57,7 +66,15 @@ export function useSimulation() {
     let previousStatus = engine.getSnapshot().status;
     const unsubscribe = engine.subscribe(() => {
       const status = engine.getSnapshot().status;
-      if (!["running", "paused"].includes(engine.getSnapshot().status)) {
+      const id = engine.getMetadata()?.id;
+      const google = id
+        ? localStorage.getItem(`typeflow-google-v1:${id}`)
+        : null;
+      const pendingGoogle = google && !JSON.parse(google).complete;
+      if (
+        !["running", "paused"].includes(engine.getSnapshot().status) &&
+        !pendingGoogle
+      ) {
         release.current?.();
         release.current = null;
         if (previousStatus !== status) {
@@ -65,7 +82,7 @@ export function useSimulation() {
             setRecoverable(
               new BrowserSessionStorage(localStorage)
                 .list()
-                .filter((s) => s.recovery !== "complete"),
+                .filter(needsRecovery),
             );
           } catch (error) {
             setRecoveryError((error as Error).message);
@@ -138,7 +155,7 @@ export function useSimulation() {
       const store = new BrowserSessionStorage(localStorage);
       if (id) store.delete(id);
       else store.clear();
-      setRecoverable(store.list().filter((s) => s.recovery !== "complete"));
+      setRecoverable(store.list().filter(needsRecovery));
       setRecoveryError("");
       if (
         engine.getSnapshot().status !== "running" &&

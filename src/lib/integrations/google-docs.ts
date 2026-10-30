@@ -1,4 +1,6 @@
-/** Contracts only. No OAuth, tokens, network calls, or fake connected states. */
+/** Legacy extension-facing contracts. The concrete portable adapter lives in google/adapter. */
+export { GoogleDocsOutputAdapter } from "../google/adapter";
+export type { GoogleTransport } from "../google/adapter";
 export type ConnectionState =
   | "disconnected"
   | "authorizing"
@@ -41,7 +43,7 @@ export type RetryPolicy = {
 };
 export interface GoogleDocsAuth {
   state(): ConnectionState;
-  /** Future server-backed authorization-code flow with PKCE and OAuth state. */
+  /** Host-specific authorization; the website uses server-side code flow with PKCE. */
   authorize(signal: AbortSignal): Promise<void>;
   disconnect(): Promise<void>;
 }

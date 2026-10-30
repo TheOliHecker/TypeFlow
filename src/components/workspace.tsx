@@ -33,6 +33,7 @@ import {
 import { useSimulation } from "@/lib/simulation/use-simulation";
 import { createPlan } from "@/lib/simulation/plan";
 import { SessionResults } from "./session-results";
+import { useGoogleOutput } from "@/lib/google/use-google-output";
 
 export function Workspace() {
   const { draft, loaded, storageError, saving, update } = useDraft();
@@ -69,14 +70,22 @@ export function Workspace() {
     discard,
     cancelSession,
   } = useSimulation();
+  const google = useGoogleOutput(engine);
   const [error, setError] = useState("");
   const paper = useRef<HTMLDivElement>(null);
   const cursor = useRef<HTMLSpanElement>(null);
   const words = useMemo(() => wordCount(text), [text]);
+  const googleWorking =
+    google.output === "google" &&
+    ["Writing", "Synchronizing", "Recovering"].includes(google.view.status);
   const active = snapshot.status === "running" || snapshot.status === "paused";
   const completedLog = useMemo(
-    () => (snapshot.status === "completed" ? engine.getLog() : null),
-    [engine, snapshot.status],
+    () =>
+      snapshot.status === "completed" &&
+      (google.output === "local" || google.view.status.startsWith("Complete"))
+        ? engine.getLog()
+        : null,
+    [engine, snapshot.status, google.output, google.view.status],
   );
   const estimate = useMemo(() => {
     if (!text.trim() && !twoTexts) return { ms: 0, error: "" };
@@ -132,7 +141,10 @@ export function Workspace() {
               ? "Interrupted session restored · paused"
               : "Paused",
           stopped: "Session stopped",
-          completed: "Complete · All your words, in place",
+          completed:
+            google.output === "google"
+              ? google.view.status
+              : "Complete · All your words, in place",
           error: `Requires attention · ${snapshot.error ?? "Document verification failed"}`,
         }[snapshot.status];
   useEffect(() => {
@@ -142,8 +154,11 @@ export function Workspace() {
   const start = () => {
     setError("");
     try {
-      void exclusive(() =>
-        engine.start(text, settings, title || "Untitled document", options),
+      void google.start(() =>
+        exclusive(() => {
+          engine.start(text, settings, title || "Untitled document", options);
+          google.started();
+        }),
       );
     } catch (e) {
       setError((e as Error).message);
@@ -161,7 +176,10 @@ export function Workspace() {
           <ArrowLeft size={13} /> Back to home
         </Link>
         <span className="private-indicator">
-          <ShieldCheck size={14} /> Private & local
+          <ShieldCheck size={14} />{" "}
+          {google.output === "google"
+            ? "Google Docs output"
+            : "Private & local"}
         </span>
       </header>
       <main id="main" className="workspace-main">
@@ -202,6 +220,7 @@ export function Workspace() {
           </div>
         )}
         {!active &&
+          !googleWorking &&
           recoverable.map((saved) => (
             <section className="restore-note" key={saved.id}>
               <p>
@@ -215,7 +234,8 @@ export function Workspace() {
               <button
                 className="button"
                 onClick={() =>
-                  void recover(saved.id, (checkpoint) =>
+                  void recover(saved.id, (checkpoint) => {
+                    google.restore(checkpoint.id);
                     update({
                       title: checkpoint.log.title,
                       text: checkpoint.plan.initialSource,
@@ -225,8 +245,8 @@ export function Workspace() {
                       finalSettings: checkpoint.log.options?.finalSettings,
                       proofreading: checkpoint.log.options?.proofreading,
                       revisionMode: checkpoint.log.options?.revisionMode,
-                    }),
-                  )
+                    });
+                  })
                 }
               >
                 Resume saved session
@@ -252,6 +272,129 @@ export function Workspace() {
               </details>
             </section>
           ))}
+        <section className="settings-panel" aria-label="Output destination">
+          <label className="advanced-field">
+            Output
+            <select
+              value={google.output}
+              disabled={active || google.busy || googleWorking}
+              onChange={(e) =>
+                google.setOutput(e.target.value as "local" | "google")
+              }
+            >
+              <option value="local">Local Preview</option>
+              <option value="google">Google Docs</option>
+            </select>
+          </label>
+          {google.output === "google" && (
+            <div>
+              <p>
+                {google.account
+                  ? `Connected: ${google.account}`
+                  : "Not connected"}
+              </p>
+              <form
+                action="/api/google/connect"
+                method="get"
+                onSubmit={google.connecting}
+              >
+                <button className="button" type="submit">
+                  {google.account ? "Reconnect Google" : "Connect Google"}
+                </button>
+              </form>
+              {google.account && (
+                <button
+                  className="button"
+                  disabled={
+                    google.busy || google.view.status === "Synchronizing"
+                  }
+                  onClick={() => void google.disconnect()}
+                >
+                  Disconnect and revoke
+                </button>
+              )}
+              <label className="advanced-field">
+                Document title
+                <input
+                  value={title}
+                  disabled={active || google.busy}
+                  maxLength={200}
+                  onChange={(e) => update({ title: e.target.value })}
+                />
+              </label>
+              <button
+                className="button"
+                disabled={
+                  !google.account || active || googleWorking || google.busy
+                }
+                onClick={() => void google.create(title)}
+              >
+                Create Document
+              </button>{" "}
+              {google.documentId && (
+                <a
+                  className="button"
+                  href={`https://docs.google.com/document/d/${encodeURIComponent(google.documentId)}/edit`}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  Open Google Doc
+                </a>
+              )}
+              <p role="status">
+                {google.busy ? "Connecting / preparing…" : google.view.status} ·
+                Stage: {snapshot.stage} · {google.view.confirmedCharacters}{" "}
+                Google-confirmed characters · {google.view.pending} pending
+                engine operations
+              </p>
+              <p>
+                Last successful synchronization:{" "}
+                {google.view.lastSync
+                  ? new Date(google.view.lastSync).toLocaleString()
+                  : "none"}
+              </p>
+              {(google.view.error || google.error) && (
+                <p className="session-error" role="alert">
+                  {google.error || google.view.error}
+                </p>
+              )}
+              {google.view.status === "Needs attention" && (
+                <button
+                  className="button"
+                  disabled={google.busy}
+                  onClick={() => void google.retry()}
+                >
+                  Reconcile Google document
+                </button>
+              )}
+              {googleWorking && !active && (
+                <button className="button" onClick={google.stop}>
+                  Stop synchronization
+                </button>
+              )}
+              {snapshot.status === "completed" &&
+                google.view.status.startsWith("Paused") && (
+                  <button
+                    className="button"
+                    disabled={google.busy}
+                    onClick={() => void google.retry()}
+                  >
+                    Reconcile and finish synchronization
+                  </button>
+                )}
+              <p>
+                Edits synchronize approximately every 30 seconds while this page
+                remains open. Pausing or stopping prevents new writes; an
+                in-flight request may still complete. Local preview progress is
+                separate from Google-confirmed progress.
+              </p>
+              <p>
+                Google records automated edits and controls version grouping.
+                This history does not prove independent human authorship.
+              </p>
+            </div>
+          )}
+        </section>
         <div className="workspace-grid">
           <div className="workspace-editor-column">
             <section className="settings-panel mode-panel">
@@ -497,13 +640,23 @@ export function Workspace() {
                 {snapshot.status === "running" ? (
                   <button
                     className="button button-primary"
-                    onClick={() => engine.pause()}
+                    onClick={() =>
+                      google.output === "google"
+                        ? google.pause()
+                        : engine.pause()
+                    }
                   >
                     <Pause size={14} /> Pause
                   </button>
                 ) : snapshot.status === "paused" ? (
                   <button
                     className="button button-primary"
+                    disabled={
+                      google.output === "google" &&
+                      (google.view.status === "Needs attention" ||
+                        google.busy ||
+                        !google.account)
+                    }
                     onClick={() => engine.resume()}
                   >
                     <Play size={14} fill="currentColor" /> Resume
@@ -513,6 +666,11 @@ export function Workspace() {
                     className="button button-primary"
                     disabled={
                       !loaded ||
+                      googleWorking ||
+                      google.busy ||
+                      google.view.status === "Synchronizing" ||
+                      (google.output === "google" &&
+                        (!google.documentId || !google.account)) ||
                       (!text.trim() && !(twoTexts && finalText.length)) ||
                       !!estimate.error
                     }
@@ -528,11 +686,22 @@ export function Workspace() {
                   <>
                     <button
                       className="button"
-                      onClick={() => engine.emergencyStop()}
+                      onClick={() =>
+                        google.output === "google"
+                          ? google.stop()
+                          : engine.emergencyStop()
+                      }
                     >
                       Emergency stop
                     </button>
-                    <button className="button" onClick={cancelSession}>
+                    <button
+                      className="button"
+                      onClick={() =>
+                        google.output === "google"
+                          ? google.stop()
+                          : cancelSession()
+                      }
+                    >
                       Cancel
                     </button>
                   </>
@@ -542,7 +711,9 @@ export function Workspace() {
                     className="icon-button"
                     aria-label="Stop session"
                     title="Stop session"
-                    onClick={() => engine.stop()}
+                    onClick={() =>
+                      google.output === "google" ? google.stop() : engine.stop()
+                    }
                   >
                     <Square size={14} />
                   </button>
@@ -551,9 +722,10 @@ export function Workspace() {
                   className="icon-button"
                   aria-label="Reset session"
                   title="Reset session"
-                  disabled={snapshot.status === "idle"}
+                  disabled={snapshot.status === "idle" || googleWorking}
                   onClick={() => {
-                    cancelSession();
+                    if (google.output === "google") google.reset();
+                    else cancelSession();
                     setError("");
                   }}
                 >

@@ -222,6 +222,7 @@ export class AdapterExecutor {
     operation: EditingOperation,
     plannedAt: number,
     previous?: WriteAhead,
+    batch?: readonly { id: string; operation: EditingOperation }[],
   ): Promise<WriteAhead> {
     if (this.stopped || this.busy || this.uncertain)
       throw new Error("Executor stopped, busy, or requires reconciliation.");
@@ -258,6 +259,28 @@ export class AdapterExecutor {
           "Adapter advertised revision tokens but returned none.",
         );
       const afterText = applyOperation(before.text, operation);
+      if (batch) {
+        if (
+          !batch.length ||
+          !this.adapter.capabilities.batch ||
+          !this.adapter.applyBatch
+        )
+          throw new Error("Adapter does not support this batch.");
+        let batchText = before.text;
+        const identities = new Set<string>();
+        for (const item of batch) {
+          if (
+            !item.id ||
+            identities.has(item.id) ||
+            !this.adapter.capabilities.operations.includes(item.operation.type)
+          )
+            throw new Error("Invalid or unsupported batch operation identity.");
+          identities.add(item.id);
+          batchText = applyOperation(batchText, item.operation);
+        }
+        if (batchText !== afterText)
+          throw new Error("Batch differs from its journal checkpoint.");
+      }
       const supported = this.adapter.capabilities.operations.includes(
         operation.type,
       );
@@ -288,11 +311,22 @@ export class AdapterExecutor {
       try {
         receipt = await Promise.race([
           supported
-            ? this.adapter.execute(operation, {
-                operationId: id,
-                expectedRevision: before.revision,
-                signal: this.controller.signal,
-              })
+            ? batch && this.adapter.applyBatch
+              ? this.adapter
+                  .applyBatch(batch, this.controller.signal)
+                  .then((receipts) => {
+                    const receipt = receipts.at(-1);
+                    if (!receipt || receipt.operationId !== batch.at(-1)?.id)
+                      throw new Error(
+                        "Batch acknowledgement identity mismatch.",
+                      );
+                    return { ...receipt, operationId: id };
+                  })
+              : this.adapter.execute(operation, {
+                  operationId: id,
+                  expectedRevision: before.revision,
+                  signal: this.controller.signal,
+                })
             : Promise.resolve({
                 operationId: id,
                 acknowledgedAt: Date.now(),

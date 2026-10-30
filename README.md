@@ -140,3 +140,5 @@ Limitations: sentence segmentation uses the runtime's English `Intl.Segmenter`; 
 ## Phase 2 Part 2B
 
 See [Editing execution and local recovery](docs/SESSIONS.md) for lifecycle, checkpoint format, scheduler ports, adapter capabilities, uncertain-write reconciliation, UTF-16 positions and future extension/Google Docs integration. Foreground scheduling and local checkpoint recovery are implemented. Extension/cloud execution and Google Docs synchronization remain contracts only.
+
+Google Docs output is available as a development integration. Follow [Google Cloud and OAuth setup](docs/google-docs-setup.md) and configure `.env.local` from `.env.example`. Live Google testing requires your explicit initiation; mocked checks do not verify credentials or version-history grouping.
