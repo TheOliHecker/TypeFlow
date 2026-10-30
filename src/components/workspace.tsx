@@ -9,15 +9,19 @@ import { useDraft } from "@/lib/use-draft";
 import { formatTime, MAX_TEXT_LENGTH, SAMPLE_TEXT, wordCount } from "@/lib/types";
 import { useSimulation } from "@/lib/simulation/use-simulation";
 import { createPlan } from "@/lib/simulation/plan";
+import { SessionResults } from "./session-results";
+import { useSessionMetadata } from "@/lib/use-session-metadata";
 
 export function Workspace() {
   const { draft, loaded, storageError, update } = useDraft();
   const { text, title, settings } = draft;
   const { engine, snapshot } = useSimulation();
+  const previous = useSessionMetadata(engine, snapshot.status);
   const [error, setError] = useState("");
   const paper = useRef<HTMLDivElement>(null);
   const words = useMemo(() => wordCount(text), [text]);
   const active = snapshot.status === "running" || snapshot.status === "paused";
+  const completedLog = useMemo(() => snapshot.status === "completed" ? engine.getLog() : null, [engine, snapshot.status]);
   const estimate = useMemo(() => {
     if (!text.trim()) return { ms: 0, error: "" };
     try { return { ms: createPlan(text, settings).durationMs, error: "" }; }
@@ -35,6 +39,7 @@ export function Workspace() {
     <main id="main" className="workspace-main">
       <div className="workspace-intro"><div><span className="eyebrow accent">A LITTLE SPACE FOR YOUR WORDS</span><h1>Find your flow<span className="accent">.</span></h1><p>Bring your words. Set the rhythm. Let them unfold.</p></div><span className="draft-status"><Check size={13} /> {storageError ? "Storage unavailable · download to keep your work" : loaded ? "Draft saved on this device" : "Loading your draft…"}</span></div>
       {error && <p className="session-error" role="alert">{error}</p>}
+      {previous && snapshot.status === "idle" && <p className="restore-note">{previous.status === "running" || previous.status === "paused" ? "Your previous session was interrupted. Your draft is restored; start a new session when you’re ready." : `Last session: ${previous.title.slice(0, 120)} · ${previous.status}. Your draft is restored.`} Full replay logs are available only until you leave this page.</p>}
       <div className="workspace-grid">
         <div className="workspace-editor-column">
           <section className="input-panel">
@@ -64,6 +69,7 @@ export function Workspace() {
             <div className="session-progress-heading"><span>Session progress</span><strong>{Math.floor(snapshot.progress)}%</strong></div><div className="session-progress" role="progressbar" aria-label="Writing progress" aria-valuenow={Math.floor(snapshot.progress)} aria-valuemin={0} aria-valuemax={100}><span style={{ width: `${snapshot.progress}%` }} /></div>
             <div className="stats-grid"><div><span>WORDS WRITTEN</span><strong>{writtenWords} <small>/ {words}</small></strong></div><div><span>ELAPSED</span><strong>{formatTime(snapshot.elapsedMs)}</strong></div><div><span>REMAINING</span><strong>{formatTime(snapshot.status === "idle" ? estimate.ms : snapshot.remainingMs)}</strong></div><div><span>CURRENT PACE</span><strong>{snapshot.currentWpm || "—"} <small>WPM</small></strong></div></div>
           </section>
+          {completedLog && <SessionResults key={completedLog.id} log={completedLog} />}
           <div className="honesty-note"><CircleHelp size={14} /><p>This is an automated writing simulation. Simulated activity does not establish original human authorship.</p></div>
         </div>
       </div>

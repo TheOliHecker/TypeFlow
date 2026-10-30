@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useReducer, useState } from "react";
+import { useEffect, useReducer, useRef, useState } from "react";
 import { DEFAULT_SETTINGS, MAX_TEXT_LENGTH, SAMPLE_TEXT, type Draft, type SimulationSettings } from "./types";
 const initial: Draft = { title: "A little room to think", text: SAMPLE_TEXT, settings: DEFAULT_SETTINGS };
 type State = { draft: Draft; loaded: boolean };
@@ -20,9 +20,11 @@ export function validateDraft(value: unknown): Draft {
 export function useDraft() {
   const [state, dispatch] = useReducer((state: State, action: Action): State => action.type === "load" ? { draft: action.draft, loaded: true } : { ...state, draft: { ...state.draft, ...action.value } }, { draft: initial, loaded: false });
   const [storageError, setStorageError] = useState(false);
+  const latestDraft = useRef(state.draft);
+  useEffect(() => { latestDraft.current = state.draft; }, [state.draft]);
   useEffect(() => { let draft = initial; try { const saved = localStorage.getItem("typeflow-draft-v1"); if (saved) draft = validateDraft(JSON.parse(saved)); } catch {} dispatch({ type: "load", draft }); }, []);
   useEffect(() => { if (!state.loaded) return; const timer = setTimeout(() => { try { localStorage.setItem("typeflow-draft-v1", JSON.stringify(state.draft)); setStorageError(false); } catch { setStorageError(true); } }, 350); return () => clearTimeout(timer); }, [state]);
   // Flush a debounced draft when navigating away or refreshing.
-  useEffect(() => { if (!state.loaded) return; const save = () => { try { localStorage.setItem("typeflow-draft-v1", JSON.stringify(state.draft)); } catch {} }; window.addEventListener("pagehide", save); return () => { save(); window.removeEventListener("pagehide", save); }; }, [state]);
+  useEffect(() => { if (!state.loaded) return; const save = () => { try { localStorage.setItem("typeflow-draft-v1", JSON.stringify(latestDraft.current)); } catch {} }; window.addEventListener("pagehide", save); return () => { save(); window.removeEventListener("pagehide", save); }; }, [state.loaded]);
   return { ...state, storageError, update: (value: Partial<Draft>) => dispatch({ type: "update", value }) };
 }

@@ -60,6 +60,7 @@ export class SimulationEngine {
   getSnapshot = () => this.snapshot;
   subscribe = (listener: () => void) => { this.listeners.add(listener); return () => { this.listeners.delete(listener); }; };
   getLog = (): SessionLog | null => this.log ? structuredClone(this.log) : null;
+  getMetadata = () => this.log ? { id: this.log.id, title: this.log.title, status: this.snapshot.status, startedAt: this.log.startedAt, updatedAt: this.clock.date().toISOString(), characters: this.log.source.length } : null;
   private notify() { for (const listener of this.listeners) listener(); }
   private cancel() { if (this.timer !== null) this.clock.clear(this.timer); this.timer = null; }
   private activeTime() { return this.accumulated + (this.snapshot.status === "running" ? this.clock.now() - this.activeOrigin : 0); }
