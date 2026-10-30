@@ -213,6 +213,8 @@ export function SessionResults({ log }: { log: SessionLog }) {
                       <td>{(event.atMs / 1000).toFixed(2)}s</td>
                       <td>
                         {event.type}
+                        {event.stage ? ` · ${event.stage}` : ""}
+                        {event.index !== undefined ? ` @ ${event.index}` : ""}
                         {event.correction ? " · correction" : ""}
                       </td>
                       <td>

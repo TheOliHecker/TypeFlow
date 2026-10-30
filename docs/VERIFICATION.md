@@ -2,7 +2,18 @@
 
 Verified locally on October 30, 2026. No public deployment or external account writes were performed.
 
-## Automated checks
+## Simulation Engine 2.0 verification
+
+- TypeScript (`pnpm typecheck`) and ESLint (`pnpm lint`) pass with no warnings.
+- Existing engine, replay and input tests pass; focused evolution tests cover all six typo categories, four correction timings, both correction methods, three diff modes, complete Unicode graphemes, independent revision preferences, custom durations with fixed pauses and explicit proofreading approvals.
+- A clock-driven staged session verifies pause/resume during revision and exact reconstruction from the schema 2 event log.
+- Production build passes with `pnpm exec next build --webpack`. Default Turbopack cannot bind its local CSS worker port in this environment, including on an escalated retry.
+- Browser smoke check on the production server: two-text mode, independent 200 WPM speeds, visual changes, exact final draft, exact replay, approval-required spelling suggestion, proofreading output and completed export controls. Restored the original example draft/preferences afterward.
+- `git diff --check` passes. No production deployment or external writes.
+
+The records below describe the earlier baseline verification, not additional browser testing performed for this phase.
+
+## Baseline automated checks
 
 - `pnpm typecheck`: passed, including generated Next.js route types.
 - `pnpm lint`: passed with no errors or warnings.

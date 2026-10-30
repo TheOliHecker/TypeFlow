@@ -34,8 +34,12 @@ pnpm start
 
 - Responsive editorial homepage, interactive typing demo, feature/how-to sections, native accessible FAQ disclosures, and light/dark themes.
 - Titled draft editor, example text, clear control, word/character counts, and a 100,000-character limit.
-- 20–120 base WPM, optional natural variation, thinking pauses, and simulated typo/backspace corrections.
-- Automatic duration estimates and custom durations with validation against feasible 20–120 WPM pacing. Custom duration scales the schedule, including pauses and corrections; it can override the base WPM setting. It is a target, not a browser timing guarantee.
+- Single-text and optional two-text workflows with independent stage settings, 20–200 base WPM and Slow/Normal/Fast/Very Fast/Custom presets.
+- QWERTY-aware nearby substitutions, missing/repeated/transposed/additional letters and common spelling slips. Relative category weights, custom frequency and immediate/word/sentence/proofreading corrections with backspacing or selection deletion.
+- Collapsed advanced settings for pause ranges, longer breaks, variation percentage, reproducible seed and feasible custom stage duration.
+- Diff-based targeted edits, paragraph rewrites or explicit full rewrite; review removed/inserted text before running. Type 1 finishes before Type 2 changes begin.
+- Optional local rule-based proofreading for spelling, grammar, punctuation and style. Every wording change requires an explicit approval; suggestions are invalidated when their source text changes. The rule set is intentionally limited, with a provider interface for future assistance.
+- Automatic duration estimates and custom durations with validation against feasible 20–200 WPM pacing. Custom duration adjusts edit timing while retaining configured thinking pauses; it can override the base WPM setting. It is a target, not a browser timing guarantee.
 - Start, pause, resume, stop, reset, progress, elapsed/remaining time, current pace, correction highlighting, and automatically scrolling preview.
 - Completed-session replay at 0.5×, 1×, 2×, 4×, or 8×, replay pause/resume/reset, paginated event inspection, and automated-session JSON exports.
 - Completed TXT and DOCX downloads with paragraph breaks, plus clipboard copy. DOCX includes an automation disclosure in document metadata; TXT preserves the supplied text exactly without adding a footer.
@@ -63,15 +67,18 @@ src/lib/types.ts             Shared settings, limits, text/time helpers
 src/lib/use-draft.ts         Validated, debounced browser persistence
 src/lib/use-session-metadata.ts  Small session summaries and refresh recovery
 src/lib/simulation/plan.ts   Seeded, deterministic simulation schedule
+src/lib/simulation/diff.ts   Bounded token diff with grapheme-safe edit boundaries
+src/lib/simulation/typos.ts  Weighted QWERTY slip generation
+src/lib/simulation/proofreading.ts  Approval-based local suggestions/provider contract
 src/lib/simulation/engine.ts Framework-independent elapsed-time engine
 src/lib/simulation/replay.ts Recorded-event playback clock
 src/lib/export.ts           TXT, lazy-loaded DOCX, and JSON downloads
 src/lib/integrations/       Future Google Docs contracts only
 ```
 
-The engine uses a monotonic clock and planned event deadlines. It compares each callback with active elapsed time rather than counting timer invocations. Pausing freezes active time. One timer per engine prevents overlap; UI snapshots are limited to approximately 25 per second. Delayed callbacks process at most 1,000 events each, giving the browser time to respond between batches. Simulated typos use an ASCII character so backspacing a simulated mistake never deletes a user Unicode character. The original source is preserved, with Windows line endings normalized to `\n`.
+The engine uses a monotonic clock and planned event deadlines. It compares each callback with active elapsed time rather than counting timer invocations. Pausing freezes active time. One timer per engine prevents overlap; UI snapshots are limited to approximately 25 per second. Delayed callbacks process at most 1,000 events each, giving the browser time to respond between batches. Typing and backspacing use grapheme boundaries, with explicit UTF-16 edit positions for integration compatibility. The supplied final text is preserved, with Windows line endings normalized to `\n`, unless a proofreading suggestion was explicitly approved.
 
-The event log has a versioned schema and records actual wall-clock timestamps, actual wall elapsed offsets (including user pauses), active elapsed time, and planned deadlines. Replay uses the recorded wall elapsed offsets, so it also reproduces delays and pauses. It never reruns the random simulation plan. A seeded planner makes the duration estimate and the execution schedule agree.
+New sessions use schema version 2; legacy positionless events still replay. `index` and `deleteCount` are UTF-16 offsets in the document immediately before an event. `source` is the approved final output; `initialSource` and `options` retain the supplied drafts/settings. Events identify draft, revision and proofreading stages, and distinguish temporary `correction` events from approved wording edits. The event log has a versioned schema and records actual wall-clock timestamps, actual wall elapsed offsets (including user pauses), active elapsed time, and planned deadlines. Replay uses the recorded wall elapsed offsets, so it also reproduces delays and pauses. It never reruns the random simulation plan. A seeded planner makes the duration estimate and the execution schedule agree.
 
 `useSyncExternalStore` consumes engine snapshots. Unmount, reset, stop, and pause cancel timers. The DOCX library loads only when requested. Completed logs stay in memory; LocalStorage stores only the draft, settings, theme, and basic session summary. Browser storage can be unavailable or cleared; download anything you need to keep.
 
@@ -94,13 +101,19 @@ See [docs/GOOGLE_DOCS.md](docs/GOOGLE_DOCS.md) for authorization, scope choices,
 ## Limits and behavior
 
 - Plain text only: paragraph breaks and spacing are preserved; pasted rich-text styles, images, Markdown rendering, and original document styles are not supported.
-- Documents are limited to 100,000 UTF-16 characters (matching textarea length semantics). Source emoji/Unicode are preserved; complex multi-code-point graphemes can briefly unfold in parts during typing.
+- Documents are limited to 100,000 UTF-16 characters (matching textarea length semantics). Source emoji/Unicode are preserved; complete grapheme clusters are typed and deleted together.
 - WPM uses the conventional five characters per word. Natural variation can momentarily be faster/slower than the selected base pace. Thinking pauses add time. The word counter counts whitespace-separated groups; it is not a language-aware tokenizer.
 - Browser throttling, device sleep, or a busy main thread can delay completion beyond the estimate or target. Overdue events catch up in bounded batches and retain actual execution timestamps.
 - Full event logs/replays are in memory until navigation, refresh, reset, editing the source/title, or starting another simulation. Export JSON before leaving if you want a permanent record. Importing old logs is not part of this MVP.
 - Stop retains the partial preview; downloads and replay are available for completed sessions. Reset clears the session and preserves the draft/settings.
 - No cross-device sync, authentication, backend, or Google Docs connection exists in this version. LocalStorage is not encrypted. Avoid storing private text on a shared device.
 - Theme follows the device preference on first visit, then remembers the explicitly selected theme.
+
+## Simulation 2.0 notes
+
+Type 2 custom duration targets the actual revision work, rather than retyping the entire final draft. No revision runs when Type 2 is blank or identical. Typo correction passes finish before the next draft stage; proofreading-timed slips within a revision insertion are restored before the next edit, keeping later edit positions stable. Unchanged text is retained by targeted edits. The bounded diff is deterministic but does not promise a globally minimal edit script for large rearrangements.
+
+Proofreading uses a small, conservative rule set, not a complete grammar checker. Google Docs synchronization remains a future integration; no external services or credentials were added. Nothing is deployed by this change.
 
 ## Recommended next steps
 

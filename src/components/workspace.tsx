@@ -17,10 +17,15 @@ import {
   Trash2,
 } from "lucide-react";
 import { Brand } from "./brand";
+import { ProofreadingPanel } from "./proofreading-panel";
+import { diffText } from "@/lib/simulation/diff";
+import { approvedText } from "@/lib/simulation/proofreading";
 import { SettingsPanel } from "./settings-panel";
 import { useDraft } from "@/lib/use-draft";
 import {
-  completedWordCount,
+  DEFAULT_SETTINGS,
+  DEFAULT_PROOFREADING,
+  type RevisionMode,
   formatTime,
   MAX_TEXT_LENGTH,
   SAMPLE_TEXT,
@@ -34,10 +39,36 @@ import { useSessionMetadata } from "@/lib/use-session-metadata";
 export function Workspace() {
   const { draft, loaded, storageError, saving, update } = useDraft();
   const { text, title, settings } = draft;
+  const twoTexts = draft.mode === "two";
+  const finalText = twoTexts ? (draft.finalText ?? "") : "";
+  const finalSettings = draft.finalSettings ?? DEFAULT_SETTINGS;
+  const proofreading = draft.proofreading ?? DEFAULT_PROOFREADING;
+  const intendedText = finalText.trim() ? finalText : text;
+  const outputText = useMemo(
+    () => approvedText(intendedText, proofreading),
+    [intendedText, proofreading],
+  );
+  const changes = useMemo(
+    () =>
+      twoTexts && finalText.trim()
+        ? diffText(text, finalText, draft.revisionMode)
+        : [],
+    [twoTexts, text, finalText, draft.revisionMode],
+  );
+  const options = useMemo(
+    () => ({
+      finalText,
+      finalSettings,
+      revisionMode: draft.revisionMode,
+      proofreading,
+    }),
+    [finalText, finalSettings, draft.revisionMode, proofreading],
+  );
   const { engine, snapshot } = useSimulation();
   const previous = useSessionMetadata(engine);
   const [error, setError] = useState("");
   const paper = useRef<HTMLDivElement>(null);
+  const cursor = useRef<HTMLSpanElement>(null);
   const words = useMemo(() => wordCount(text), [text]);
   const active = snapshot.status === "running" || snapshot.status === "paused";
   const completedLog = useMemo(
@@ -47,18 +78,38 @@ export function Workspace() {
   const estimate = useMemo(() => {
     if (!text.trim()) return { ms: 0, error: "" };
     try {
+      return {
+        ms: createPlan(text, settings, undefined, options).durationMs,
+        error: "",
+      };
+    } catch (e) {
+      return { ms: 0, error: (e as Error).message };
+    }
+  }, [text, settings, options]);
+  const firstEstimate = useMemo(() => {
+    if (!text.trim()) return { ms: 0, error: "" };
+    try {
       return { ms: createPlan(text, settings).durationMs, error: "" };
     } catch (e) {
-      return {
-        ms: createPlan(text, { ...settings, durationSeconds: null }).durationMs,
-        error: (e as Error).message,
-      };
+      return { ms: 0, error: (e as Error).message };
     }
   }, [text, settings]);
-  const writtenWords = useMemo(
-    () => completedWordCount(text, snapshot.sourceIndex),
-    [text, snapshot.sourceIndex],
-  );
+  const secondEstimate = useMemo(() => {
+    if (!finalText.trim() || !text.trim()) return { ms: 0, error: "" };
+    try {
+      const base = createPlan(text, { ...settings, durationSeconds: null });
+      const combined = createPlan(
+        text,
+        { ...settings, durationSeconds: null },
+        undefined,
+        { finalText, finalSettings, revisionMode: draft.revisionMode },
+      );
+      return { ms: combined.durationMs - base.durationMs, error: "" };
+    } catch (e) {
+      return { ms: 0, error: (e as Error).message };
+    }
+  }, [text, settings, finalText, finalSettings, draft.revisionMode]);
+  const writtenWords = wordCount(snapshot.text);
   const statusText =
     snapshot.status === "running"
       ? snapshot.activity === "thinking"
@@ -73,13 +124,13 @@ export function Workspace() {
           completed: "All your words, in place",
         }[snapshot.status];
   useEffect(() => {
-    if (paper.current && snapshot.status === "running")
-      paper.current.scrollTop = paper.current.scrollHeight;
+    if (snapshot.status === "running")
+      cursor.current?.scrollIntoView({ block: "nearest" });
   }, [snapshot.text, snapshot.status]);
   const start = () => {
     setError("");
     try {
-      engine.start(text, settings, title || "Untitled document");
+      engine.start(text, settings, title || "Untitled document", options);
     } catch (e) {
       setError((e as Error).message);
     }
@@ -136,10 +187,28 @@ export function Workspace() {
         )}
         <div className="workspace-grid">
           <div className="workspace-editor-column">
+            <section className="settings-panel mode-panel">
+              <fieldset disabled={active || !loaded}>
+                <label className="advanced-field">
+                  Simulation mode
+                  <select
+                    value={draft.mode ?? "single"}
+                    onChange={(e) => {
+                      engine.reset();
+                      update({ mode: e.target.value as "single" | "two" });
+                    }}
+                  >
+                    <option value="single">Single text</option>
+                    <option value="two">Two texts · draft evolution</option>
+                  </select>
+                </label>
+              </fieldset>
+            </section>
             <section className="input-panel">
               <div className="panel-heading">
                 <h2>
-                  <FileText size={15} /> Your words
+                  <FileText size={15} />{" "}
+                  {twoTexts ? "Type 1 · Initial draft" : "Your words"}
                 </h2>
                 <button
                   className="text-button"
@@ -207,9 +276,104 @@ export function Workspace() {
             <SettingsPanel
               settings={settings}
               disabled={active || !loaded}
-              onChange={(settings) => update({ settings })}
-              estimateMs={estimate.ms}
-              durationError={estimate.error}
+              label={twoTexts ? "Type 1 · Writing settings" : "Your rhythm"}
+              onChange={(settings) => {
+                engine.reset();
+                update({ settings });
+              }}
+              estimateMs={firstEstimate.ms}
+              durationError={firstEstimate.error}
+            />
+            {twoTexts && (
+              <>
+                <section className="input-panel">
+                  <div className="panel-heading">
+                    <h2>
+                      <FileText size={15} />
+                      Type 2 · Final draft (optional)
+                    </h2>
+                  </div>
+                  <label className="sr-only" htmlFor="final-text">
+                    Final draft
+                  </label>
+                  <textarea
+                    id="final-text"
+                    className="source-text"
+                    maxLength={MAX_TEXT_LENGTH}
+                    disabled={active || !loaded}
+                    value={finalText}
+                    placeholder="Paste your final draft. Leave blank to simulate only Type 1."
+                    onChange={(e) => {
+                      engine.reset();
+                      update({
+                        finalText: e.target.value.replace(/\r\n?/g, "\n"),
+                      });
+                    }}
+                  />
+                  <div className="editor-footer">
+                    {wordCount(finalText)} words ·{" "}
+                    {finalText.length.toLocaleString()} /{" "}
+                    {MAX_TEXT_LENGTH.toLocaleString()} characters
+                  </div>
+                  <fieldset disabled={active || !loaded}>
+                    <label className="advanced-field">
+                      Revision mode
+                      <select
+                        value={draft.revisionMode ?? "targeted"}
+                        onChange={(e) => {
+                          engine.reset();
+                          update({
+                            revisionMode: e.target.value as RevisionMode,
+                          });
+                        }}
+                      >
+                        <option value="targeted">Targeted edits</option>
+                        <option value="paragraph">Paragraph rewrites</option>
+                        <option value="full">Full rewrite</option>
+                      </select>
+                    </label>
+                  </fieldset>
+                  {!!finalText.trim() && (
+                    <details className="revision-changes">
+                      <summary>
+                        {changes.length} planned changes · review draft
+                        evolution
+                      </summary>
+                      {changes.length ? (
+                        changes.map((c, i) => (
+                          <div key={i}>
+                            <small>Position {c.index}</small>
+                            {c.removed && <del>{c.removed}</del>}
+                            {c.inserted && <ins>{c.inserted}</ins>}
+                          </div>
+                        ))
+                      ) : (
+                        <p>Both drafts match; no revision needed.</p>
+                      )}
+                    </details>
+                  )}
+                </section>
+                <SettingsPanel
+                  label="Type 2 · Revision settings"
+                  settings={finalSettings}
+                  disabled={active || !loaded}
+                  onChange={(finalSettings) => {
+                    engine.reset();
+                    update({ finalSettings });
+                  }}
+                  estimateMs={secondEstimate.ms}
+                  durationError={secondEstimate.error}
+                />
+              </>
+            )}
+            <ProofreadingPanel
+              text={intendedText}
+              settings={proofreading}
+              disabled={active || !loaded}
+              onChange={(proofreading) => {
+                engine.reset();
+                update({ proofreading });
+              }}
             />
             <div className="privacy-note">
               <ShieldCheck size={15} />
@@ -253,8 +417,15 @@ export function Workspace() {
                   <div
                     className={`live-text ${snapshot.activity === "correcting" && active ? "is-correcting" : ""}`}
                   >
-                    {snapshot.text}
-                    {active && <span className="typing-cursor" />}
+                    {active && snapshot.editIndex !== undefined ? (
+                      <>
+                        {snapshot.text.slice(0, snapshot.editIndex)}
+                        <span className="typing-cursor" ref={cursor} />
+                        {snapshot.text.slice(snapshot.editIndex)}
+                      </>
+                    ) : (
+                      snapshot.text
+                    )}
                   </div>
                 )}
               </div>
@@ -309,10 +480,17 @@ export function Workspace() {
                 </button>
                 <span role="status">
                   <i className="status-dot" />
-                  {statusText}
+                  {active
+                    ? `${snapshot.stage === "draft" ? "Type 1 · Drafting" : snapshot.stage === "revision" ? "Type 2 · Revising" : "Proofreading"} · ${statusText}`
+                    : statusText}
                 </span>
               </div>
             </section>
+            {estimate.error && (
+              <p className="session-error" role="alert">
+                {estimate.error}
+              </p>
+            )}
             <section className="session-panel">
               <div className="session-progress-heading">
                 <span>Session progress</span>
@@ -332,7 +510,7 @@ export function Workspace() {
                 <div>
                   <span>WORDS WRITTEN</span>
                   <strong>
-                    {writtenWords} <small>/ {words}</small>
+                    {writtenWords} <small>/ {wordCount(outputText)}</small>
                   </strong>
                 </div>
                 <div>

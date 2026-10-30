@@ -2096,3 +2096,92 @@ textarea:disabled {
     font-size: 12px;
   }
 }
+
+.advanced-settings {
+  margin-top: 20px;
+  border-top: 1px solid var(--line);
+  padding-top: 16px;
+}
+.advanced-settings summary,
+.revision-changes summary {
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 8px 0;
+}
+.advanced-field {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 13px;
+  margin: 14px 0;
+}
+.advanced-field input,
+.advanced-field select,
+.category-control input[type="number"] {
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: inherit;
+  border-radius: 6px;
+  padding: 7px;
+  max-width: 100%;
+}
+.advanced-field input {
+  width: 110px;
+}
+.category-control {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  font-size: 12px;
+}
+.category-control > label:last-child {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.category-control input[type="number"] {
+  width: 62px;
+}
+.suggestion {
+  display: flex;
+  gap: 10px;
+  margin: 15px 0;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+.suggestion small {
+  display: block;
+  margin-top: 6px;
+  opacity: 0.7;
+}
+.revision-changes {
+  padding: 0 22px 18px;
+}
+.revision-changes div {
+  margin-top: 12px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 13px;
+}
+.revision-changes small {
+  display: block;
+  opacity: 0.6;
+}
+.revision-changes del,
+.suggestion del {
+  background: #e8818125;
+  text-decoration-color: #c55050;
+}
+.revision-changes ins,
+.suggestion ins {
+  background: #74ba8425;
+  text-decoration: none;
+}
+.mode-panel fieldset {
+  padding-top: 8px;
+  padding-bottom: 8px;
+}

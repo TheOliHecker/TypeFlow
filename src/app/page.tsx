@@ -18,7 +18,7 @@ const features = [
   {
     icon: Gauge,
     title: "Find your tempo.",
-    text: "From a thoughtful 20 to a flowing 120 words per minute. Set the pace and let natural variation do the rest.",
+    text: "From a thoughtful 20 to a flowing 200 words per minute. Set the pace and let natural variation do the rest.",
     detail: "YOUR PACE, YOUR PROCESS",
   },
   {
