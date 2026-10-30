@@ -175,6 +175,7 @@ export function Workspace() {
         <Link href="/" className="workspace-home">
           <ArrowLeft size={13} /> Back to home
         </Link>
+        <Link href="/settings">Settings</Link>
         <span className="private-indicator">
           <ShieldCheck size={14} />{" "}
           {google.output === "google"

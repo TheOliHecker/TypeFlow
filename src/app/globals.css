@@ -2185,3 +2185,185 @@ textarea:disabled {
   padding-top: 8px;
   padding-bottom: 8px;
 }
+
+/* Private developer laboratory; scoped independently of the public workspace. */
+.dev-shell {
+  --bg: #12151e;
+  --surface: #1b2030;
+  --ink: #e8ebf7;
+  --muted: #a4aec7;
+  --line: #30394f;
+  --accent: #a5b4fc;
+  background: var(--bg);
+  color: var(--ink);
+  min-height: 100vh;
+  padding: 32px max(20px, calc((100vw - 1440px) / 2));
+  color-scheme: dark;
+}
+.dev-shell h1 {
+  font-size: 32px;
+  margin: 8px 0;
+  letter-spacing: -1px;
+}
+.dev-shell h2 {
+  font-size: 20px;
+  margin: 0 0 16px;
+}
+.dev-shell h3 {
+  margin-top: 24px;
+}
+.dev-shell p {
+  color: var(--muted);
+}
+.dev-shell a {
+  color: var(--accent);
+}
+.dev-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+.dev-kicker {
+  font-size: 11px;
+  letter-spacing: 2px;
+}
+.dev-notice {
+  padding: 16px;
+  border: 1px solid #3a4569;
+  background: #202840;
+  border-radius: 10px;
+}
+.dev-tabs,
+.dev-controls {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 18px 0;
+  align-items: center;
+}
+.dev-shell button {
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: #262e45;
+  color: var(--ink);
+  padding: 9px 14px;
+  cursor: pointer;
+}
+.dev-shell button[aria-current="page"] {
+  background: #4b5794;
+  border-color: var(--accent);
+}
+.dev-shell button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.dev-shell button:focus-visible,
+.dev-shell input:focus-visible,
+.dev-shell textarea:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.dev-card {
+  background: var(--surface);
+  padding: 24px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  margin: 20px 0;
+}
+.dev-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+}
+.dev-metrics > div {
+  background: #151a28;
+  padding: 14px;
+  border-radius: 8px;
+}
+.dev-shell small {
+  display: block;
+  color: var(--muted);
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+.dev-metrics strong {
+  font-size: 17px;
+  display: block;
+  margin-top: 6px;
+}
+.dev-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 18px;
+}
+.dev-shell label {
+  display: block;
+  margin: 10px 0;
+}
+.dev-shell input:not([type="checkbox"]):not([type="range"]),
+.dev-shell select,
+.dev-shell textarea {
+  display: block;
+  width: 100%;
+  background: #131927;
+  color: var(--ink);
+  border: 1px solid #3c4864;
+  padding: 10px;
+  border-radius: 6px;
+  margin: 6px 0;
+}
+.dev-shell input[type="checkbox"] {
+  accent-color: #a5b4fc;
+}
+.dev-shell textarea {
+  min-height: 110px;
+  resize: vertical;
+}
+.dev-shell fieldset {
+  border: 0;
+  padding: 0;
+  min-width: 0;
+}
+.dev-shell pre {
+  max-height: 450px;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  padding: 16px;
+  background: #111623;
+  border-radius: 8px;
+  font-size: 12px;
+}
+.dev-shell .dev-danger {
+  background: #462c3e;
+  border-color: #9f667e;
+}
+.dev-error {
+  padding: 16px;
+  border: 1px solid #c77d8d;
+  border-radius: 8px;
+}
+.dev-table {
+  overflow: auto;
+}
+.dev-shell table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 12px;
+}
+.dev-shell td,
+.dev-shell th {
+  text-align: left;
+  padding: 12px;
+  border-bottom: 1px solid var(--line);
+  vertical-align: top;
+  min-width: 100px;
+}
+.dev-shell ins {
+  color: #99dfbc;
+}
+.dev-shell del {
+  color: #f3a1b6;
+}

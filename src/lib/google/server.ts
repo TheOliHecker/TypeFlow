@@ -7,6 +7,7 @@ type Session = {
   token: string;
   expires: number;
   email: string;
+  emailVerified: boolean;
   writes: number[];
 };
 type Flow = { state: string; verifier: string; expires: number };
@@ -153,6 +154,7 @@ export async function callback(url: URL) {
     token: data.access_token,
     expires: Date.now() + seconds * 1000,
     email: profile.email ?? "Google account",
+    emailVerified: profile.verified_email === true,
     writes: [],
   });
   jar.set(SESSION_COOKIE, sessionId, cookieOptions(seconds));
