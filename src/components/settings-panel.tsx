@@ -1,6 +1,156 @@
 "use client";
 import { ChevronDown, Clock3, SlidersHorizontal, Sparkles } from "lucide-react";
-import { formatTime, type Intensity, type SimulationSettings } from "@/lib/types";
-export function SettingsPanel({ settings, onChange, disabled, estimateMs, durationError }: { settings: SimulationSettings; onChange: (s: SimulationSettings) => void; disabled: boolean; estimateMs: number; durationError?: string }) {
-  return <section className="settings-panel"><div className="panel-heading"><h2><SlidersHorizontal size={15} /> Your rhythm</h2><span>MAKE IT YOURS</span></div><fieldset disabled={disabled}><label className="speed-heading" htmlFor="wpm">Typing speed <strong>{settings.wpm}<small> WPM</small></strong></label><input id="wpm" type="range" min="20" max="120" value={settings.wpm} onChange={e => onChange({ ...settings, wpm: +e.target.value })} /><div className="range-labels"><span>20 · Thoughtful</span><span>120 · In the flow</span></div><label className="checkbox-label"><input type="checkbox" checked={settings.variation} onChange={e => onChange({ ...settings, variation: e.target.checked })} /> Natural speed variation <Sparkles size={12} /></label>{([['pauses', 'Thinking pauses', 'A moment for ideas to breathe.'], ['typos', 'Typo corrections', 'Small slips, automatically corrected.']] as const).map(([key, label, detail]) => <div className="setting-row" key={key}><div><label htmlFor={key}>{label}</label><p>{detail}</p></div><div className="select-wrap"><select id={key} value={settings[key]} onChange={e => onChange({ ...settings, [key]: e.target.value as Intensity })}>{["off", "low", "medium", "high"].map(v => <option key={v} value={v}>{v.charAt(0).toUpperCase() + v.slice(1)}</option>)}</select><ChevronDown size={12} /></div></div>)}<div className="duration-section"><label htmlFor="duration"><Clock3 size={14} /> Session duration</label><div className="duration-tabs"><button className={settings.durationSeconds === null ? "selected" : ""} onClick={() => onChange({ ...settings, durationSeconds: null })}>Automatic</button><button className={settings.durationSeconds !== null ? "selected" : ""} onClick={() => onChange({ ...settings, durationSeconds: Math.max(1, Math.ceil(estimateMs / 1000)) })}>Custom</button></div>{settings.durationSeconds !== null && <div className="duration-input"><input id="duration" aria-label="Custom duration in seconds" type="number" min="1" max="604800" value={settings.durationSeconds} onChange={e => onChange({ ...settings, durationSeconds: Math.max(1, Math.min(604800, Number(e.target.value) || 1)) })} /><span>seconds</span></div>}<div className="estimate-row"><span>Estimated duration</span><strong>{formatTime(estimateMs)}</strong></div>{durationError ? <p role="alert" className="field-error">{durationError}</p> : <p className="setting-hint">A natural estimate. Timing may vary slightly.</p>}</div></fieldset></section>;
+import {
+  formatTime,
+  type Intensity,
+  type SimulationSettings,
+} from "@/lib/types";
+export function SettingsPanel({
+  settings,
+  onChange,
+  disabled,
+  estimateMs,
+  durationError,
+}: {
+  settings: SimulationSettings;
+  onChange: (s: SimulationSettings) => void;
+  disabled: boolean;
+  estimateMs: number;
+  durationError?: string;
+}) {
+  return (
+    <section className="settings-panel">
+      <div className="panel-heading">
+        <h2>
+          <SlidersHorizontal size={15} /> Your rhythm
+        </h2>
+        <span>MAKE IT YOURS</span>
+      </div>
+      <fieldset disabled={disabled}>
+        <label className="speed-heading" htmlFor="wpm">
+          Typing speed{" "}
+          <strong>
+            {settings.wpm}
+            <small> WPM</small>
+          </strong>
+        </label>
+        <input
+          id="wpm"
+          type="range"
+          min="20"
+          max="120"
+          value={settings.wpm}
+          onChange={(e) => onChange({ ...settings, wpm: +e.target.value })}
+        />
+        <div className="range-labels">
+          <span>20 · Thoughtful</span>
+          <span>120 · In the flow</span>
+        </div>
+        <label className="checkbox-label">
+          <input
+            type="checkbox"
+            checked={settings.variation}
+            onChange={(e) =>
+              onChange({ ...settings, variation: e.target.checked })
+            }
+          />{" "}
+          Natural speed variation <Sparkles size={12} />
+        </label>
+        {(
+          [
+            ["pauses", "Thinking pauses", "A moment for ideas to breathe."],
+            [
+              "typos",
+              "Typo corrections",
+              "Small slips, automatically corrected.",
+            ],
+          ] as const
+        ).map(([key, label, detail]) => (
+          <div className="setting-row" key={key}>
+            <div>
+              <label htmlFor={key}>{label}</label>
+              <p>{detail}</p>
+            </div>
+            <div className="select-wrap">
+              <select
+                id={key}
+                value={settings[key]}
+                onChange={(e) =>
+                  onChange({ ...settings, [key]: e.target.value as Intensity })
+                }
+              >
+                {["off", "low", "medium", "high"].map((v) => (
+                  <option key={v} value={v}>
+                    {v.charAt(0).toUpperCase() + v.slice(1)}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown size={12} />
+            </div>
+          </div>
+        ))}
+        <div className="duration-section">
+          <label htmlFor="duration">
+            <Clock3 size={14} /> Session duration
+          </label>
+          <div className="duration-tabs">
+            <button
+              className={settings.durationSeconds === null ? "selected" : ""}
+              onClick={() => onChange({ ...settings, durationSeconds: null })}
+            >
+              Automatic
+            </button>
+            <button
+              className={settings.durationSeconds !== null ? "selected" : ""}
+              onClick={() =>
+                onChange({
+                  ...settings,
+                  durationSeconds: Math.max(1, Math.ceil(estimateMs / 1000)),
+                })
+              }
+            >
+              Custom
+            </button>
+          </div>
+          {settings.durationSeconds !== null && (
+            <div className="duration-input">
+              <input
+                id="duration"
+                aria-label="Custom duration in seconds"
+                type="number"
+                min="1"
+                max="604800"
+                value={settings.durationSeconds}
+                onChange={(e) =>
+                  onChange({
+                    ...settings,
+                    durationSeconds: Math.max(
+                      1,
+                      Math.min(604800, Number(e.target.value) || 1),
+                    ),
+                  })
+                }
+              />
+              <span>seconds</span>
+            </div>
+          )}
+          <div className="estimate-row">
+            <span>Estimated duration</span>
+            <strong>{formatTime(estimateMs)}</strong>
+          </div>
+          {durationError ? (
+            <p role="alert" className="field-error">
+              {durationError}
+            </p>
+          ) : (
+            <p className="setting-hint">
+              {settings.durationSeconds === null
+                ? "A natural estimate. Timing may vary slightly."
+                : "Custom duration adjusts the base pace within 20–120 WPM. Browser timing may vary."}
+            </p>
+          )}
+        </div>
+      </fieldset>
+    </section>
+  );
 }
