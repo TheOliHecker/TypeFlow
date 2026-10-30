@@ -1,5 +1,11 @@
 import { type SimulationSettings } from "../types";
-import { createPlan, type PlanEvent, type SimulationPlan } from "./plan";
+import {
+  createPlan,
+  type PlanEvent,
+  type SimulationPlan,
+  type SessionOptions,
+  type Stage,
+} from "./plan";
 
 export type Status = "idle" | "running" | "paused" | "stopped" | "completed";
 export type SimulationEvent = Omit<PlanEvent, "scheduledMs" | "type"> & {
@@ -10,12 +16,14 @@ export type SimulationEvent = Omit<PlanEvent, "scheduledMs" | "type"> & {
   scheduledMs?: number;
 };
 export type SessionLog = {
-  schemaVersion: 1;
+  schemaVersion: 1 | 2;
   kind: "automated-writing-simulation";
   authorshipNotice: string;
   id: string;
   title: string;
   source: string;
+  initialSource?: string;
+  options?: SessionOptions;
   settings: SimulationSettings;
   startedAt: string;
   completedAt?: string;
@@ -31,6 +39,8 @@ export type Snapshot = {
   currentWpm: number;
   activity: "typing" | "thinking" | "correcting";
   eventCount: number;
+  stage: Stage;
+  editIndex?: number;
 };
 export const IDLE_SNAPSHOT: Snapshot = {
   status: "idle",
@@ -42,6 +52,7 @@ export const IDLE_SNAPSHOT: Snapshot = {
   currentWpm: 0,
   activity: "typing",
   eventCount: 0,
+  stage: "draft",
 };
 
 /** Clock injection makes timer drift, suspension, and cleanup testable. */
@@ -60,11 +71,15 @@ const browserClock: Clock = {
 
 export function applyEvent(
   text: string,
-  event: Pick<SimulationEvent, "type" | "text">,
+  event: Pick<SimulationEvent, "type" | "text" | "index" | "deleteCount">,
 ): string {
-  if (event.type === "insert") return text + (event.text ?? "");
-  // Generated mistakes are a single ASCII character, never a user grapheme.
-  if (event.type === "delete") return text.slice(0, -1);
+  const index =
+    event.index ??
+    (event.type === "delete" ? Math.max(0, text.length - 1) : text.length);
+  if (event.type === "insert")
+    return text.slice(0, index) + (event.text ?? "") + text.slice(index);
+  if (event.type === "delete")
+    return text.slice(0, index) + text.slice(index + (event.deleteCount ?? 1));
   return text;
 }
 
@@ -129,10 +144,11 @@ export class SimulationEngine {
     text: string,
     settings: SimulationSettings,
     title = "Untitled document",
+    options: SessionOptions = {},
   ) {
     if (this.snapshot.status === "running" || this.snapshot.status === "paused")
       return false;
-    const plan = createPlan(text, settings);
+    const plan = createPlan(text, settings, undefined, options);
     this.cancel();
     this.plan = plan;
     this.index = 0;
@@ -140,7 +156,7 @@ export class SimulationEngine {
     this.origin = this.activeOrigin = this.clock.now();
     const startedAt = this.clock.date().toISOString();
     this.log = {
-      schemaVersion: 1,
+      schemaVersion: 2,
       kind: "automated-writing-simulation",
       authorshipNotice:
         "Automated simulation of supplied text. Event timestamps record actual browser activity; they do not prove original human authorship.",
@@ -150,7 +166,9 @@ export class SimulationEngine {
           : `session-${this.clock.date().getTime()}`,
       title,
       source: plan.source,
-      settings: { ...settings },
+      initialSource: plan.initialSource,
+      options: structuredClone(options),
+      settings: structuredClone(settings),
       startedAt,
       events: [],
     };
@@ -176,6 +194,8 @@ export class SimulationEngine {
     let text = this.snapshot.text;
     let sourceIndex = this.snapshot.sourceIndex;
     let activity = this.snapshot.activity;
+    let stage = this.snapshot.stage;
+    let editIndex = this.snapshot.editIndex;
     let processed = 0;
     // Bound work after background-tab throttling. All overdue events still retain
     // their actual processing timestamps instead of invented historical times.
@@ -187,6 +207,11 @@ export class SimulationEngine {
       const event = this.plan.events[this.index++];
       text = applyEvent(text, event);
       sourceIndex = event.sourceIndex;
+      stage = event.stage ?? stage;
+      if (event.index !== undefined)
+        editIndex =
+          event.index +
+          (event.type === "insert" ? (event.text?.length ?? 0) : 0);
       activity =
         event.type === "thinking"
           ? "thinking"
@@ -219,7 +244,9 @@ export class SimulationEngine {
       sourceIndex,
       elapsedMs,
       remainingMs: Math.max(0, this.plan.durationMs - elapsedMs),
-      progress: (sourceIndex / this.plan.source.length) * 100,
+      progress: Math.min(99, (this.index / this.plan.events.length) * 100),
+      stage,
+      editIndex,
       currentWpm,
       activity,
       eventCount: this.log!.events.length,
