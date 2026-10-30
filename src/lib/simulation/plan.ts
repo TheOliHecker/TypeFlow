@@ -1,21 +1,26 @@
 import {
-  DEFAULT_ADVANCED,
   MAX_TEXT_LENGTH,
   TYPO_CATEGORIES,
   type SimulationSettings,
-  type AdvancedSettings,
   type RevisionMode,
   type ProofreadingSettings,
 } from "../types";
 import { characters, diffText, type TextChange } from "./diff";
 import { randomGenerator, typoGenerator } from "./typos";
+import { validateSettings, intensity } from "./settings";
+export { advancedSettings, validateSettings } from "./settings";
+import { planRevisions } from "./revisions";
+import { applyOperation } from "./operations";
+import { boundaryPause } from "./rhythm";
 import { approvedText } from "./proofreading";
 
 export type Stage = "draft" | "revision" | "proofreading";
 export type PlanEvent = {
   scheduledMs: number;
-  type: "insert" | "delete" | "thinking" | "stage";
+  type: "insert" | "delete" | "thinking" | "stage" | "replace" | "verify";
   text?: string;
+  expected?: string;
+  operation?: string;
   sourceIndex: number;
   /** Time spent on the edit itself, excluding thinking pauses. */
   typingMs?: number;
@@ -37,84 +42,13 @@ export type SimulationPlan = {
   durationMs: number;
   source: string;
   initialSource: string;
+  baseWpm: number;
   effectiveWpm: number;
+  initialDurationMs: number;
+  revisionDurationMs: number;
 };
-const intensity = { off: 0, low: 1, medium: 2, high: 3 };
-export function advancedSettings(
-  settings: SimulationSettings,
-): AdvancedSettings {
-  return {
-    ...DEFAULT_ADVANCED,
-    ...settings.advanced,
-    categories: {
-      ...DEFAULT_ADVANCED.categories,
-      ...settings.advanced?.categories,
-    },
-    probabilities: {
-      ...DEFAULT_ADVANCED.probabilities,
-      ...settings.advanced?.probabilities,
-    },
-  };
-}
-export function validateSettings(settings: SimulationSettings) {
-  if (!Number.isFinite(settings.wpm) || settings.wpm < 20 || settings.wpm > 200)
-    throw new Error("Typing speed must be between 20 and 200 WPM.");
-  if (
-    !Object.hasOwn(intensity, settings.pauses) ||
-    !Object.hasOwn(intensity, settings.typos)
-  )
-    throw new Error("Choose a valid pause and correction intensity.");
-  const a = advancedSettings(settings);
-  for (const [min, max] of [
-    [a.sentenceMinMs, a.sentenceMaxMs],
-    [a.paragraphMinMs, a.paragraphMaxMs],
-  ]) {
-    if (
-      !Number.isFinite(min) ||
-      !Number.isFinite(max) ||
-      min < 0 ||
-      max < min ||
-      max > 600000
-    )
-      throw new Error(
-        "Pause ranges must be ordered and between 0 and 600000 milliseconds.",
-      );
-  }
-  if (
-    !Number.isInteger(a.seed) ||
-    !Number.isFinite(a.variationPercent) ||
-    a.variationPercent < 0 ||
-    a.variationPercent > 90
-  )
-    throw new Error(
-      "Use an integer seed and speed variation between 0 and 90%.",
-    );
-  if (
-    a.typoProbability !== null &&
-    (!Number.isFinite(a.typoProbability) ||
-      a.typoProbability < 0 ||
-      a.typoProbability > 1)
-  )
-    throw new Error("Typo probability must be between 0 and 100%.");
-  if (
-    !["immediate", "word", "sentence", "proofreading"].includes(
-      a.correctionTiming,
-    ) ||
-    !["backspace", "replace"].includes(a.correctionMethod)
-  )
-    throw new Error("Choose valid correction preferences.");
-  for (const category of TYPO_CATEGORIES)
-    if (
-      typeof a.categories[category] !== "boolean" ||
-      !Number.isFinite(a.probabilities[category]) ||
-      a.probabilities[category] < 0 ||
-      a.probabilities[category] > 100
-    )
-      throw new Error("Typo category weights must be between 0 and 100.");
-  return a;
-}
-const normalize = (text: string) => {
-  const source = text.replace(/\r\n?/g, "\n");
+const checkedText = (text: string) => {
+  const source = text;
   if (source.length > MAX_TEXT_LENGTH)
     throw new Error(
       `Documents are limited to ${MAX_TEXT_LENGTH.toLocaleString()} characters.`,
@@ -129,12 +63,13 @@ export function createPlan(
   seed?: number,
   options: SessionOptions = {},
 ): SimulationPlan {
-  const initialSource = normalize(input);
-  if (!initialSource.trim())
+  const initialSource = checkedText(input);
+  if (!initialSource.trim() && options.finalText === undefined)
     throw new Error("Add a few words before starting your session.");
-  const target = options.finalText?.trim()
-    ? normalize(options.finalText)
-    : initialSource;
+  const target =
+    options.finalText !== undefined
+      ? checkedText(options.finalText)
+      : initialSource;
   const events: PlanEvent[] = [];
   let time = 0,
     document = "",
@@ -155,7 +90,11 @@ export function createPlan(
         ? 1 + ((random() * 2 - 1) * a.variationPercent) / 100
         : 1);
     time += duration;
-    if (event.type === "insert" || event.type === "delete")
+    if (
+      event.type === "insert" ||
+      event.type === "delete" ||
+      event.type === "replace"
+    )
       typingTime += duration;
     const planned: PlanEvent = {
       ...event,
@@ -163,18 +102,28 @@ export function createPlan(
       scheduledMs: time,
       sourceIndex,
     };
-    if (event.type === "insert" || event.type === "delete")
+    if (
+      event.type === "insert" ||
+      event.type === "delete" ||
+      event.type === "replace"
+    )
       planned.typingMs = duration;
     events.push(planned);
     if (event.type === "insert")
-      document =
-        document.slice(0, event.index!) +
-        event.text +
-        document.slice(event.index!);
-    if (event.type === "delete")
-      document =
-        document.slice(0, event.index!) +
-        document.slice(event.index! + event.deleteCount!);
+      document = applyOperation(document, {
+        type: "insert",
+        index: event.index!,
+        text: event.text ?? "",
+      });
+    if (event.type === "delete" || event.type === "replace")
+      document = applyOperation(document, {
+        type: event.type,
+        index: event.index!,
+        expected: event.expected ?? event.text ?? "",
+        text: event.text ?? "",
+      });
+    if (event.type === "verify")
+      applyOperation(document, { type: "verify", expected: event.expected! });
   };
   const edit = (change: TextChange, correction = false) => {
     if (change.removed) {
@@ -299,16 +248,9 @@ export function createPlan(
       if (a.correctionTiming === "word") flush();
     }
     if (/[.!?\n]/u.test(token) && a.correctionTiming === "sentence") flush();
-    if (intensity[settings.pauses] && sourceIndex < initialSource.length) {
-      for (const boundary of token.match(/\n\n+|[.!?](?:\s|$)/gu) ?? []) {
-        const paragraph = boundary.startsWith("\n");
-        const min = paragraph ? a.paragraphMinMs : a.sentenceMinMs;
-        const max = paragraph ? a.paragraphMaxMs : a.sentenceMaxMs;
-        emit({ type: "thinking" }, base * 0.5);
-        time +=
-          ((min + random() * (max - min)) * intensity[settings.pauses]) / 2;
-        if (a.longerBreaks && random() < 0.15) time += 5000 + random() * 10000;
-      }
+    if (sourceIndex < initialSource.length) {
+      const pause = boundaryPause(token, settings, a, random);
+      if (pause) emit({ type: "thinking" }, pause);
     }
   }
   if (pending.length) {
@@ -331,7 +273,7 @@ export function createPlan(
     )
       throw new Error("Custom duration must be between 1 second and 7 days.");
     const pauses = duration - typing;
-    const shortest = pauses + (typing * config.wpm) / 200,
+    const shortest = pauses + (typing * config.wpm) / 300,
       longest = pauses + (typing * config.wpm) / 20;
     if (longest < 1000)
       throw new Error(
@@ -339,7 +281,7 @@ export function createPlan(
       );
     if (requested < shortest - 0.001 || requested > longest + 0.001)
       throw new Error(
-        `Choose ${Math.ceil(shortest / 1000)}–${Math.floor(longest / 1000)} seconds to stay within 20–200 WPM with these pauses and corrections.`,
+        `Choose ${Math.ceil(shortest / 1000)}–${Math.floor(longest / 1000)} seconds to stay within 20–300 WPM with these pauses and corrections.`,
       );
     const factor = typing ? (requested - pauses) / typing : 1;
     let previous = stageStart,
@@ -356,7 +298,8 @@ export function createPlan(
     time = stageStart + requested;
   };
   scaleStage(begin, 0, typingTime, settings);
-  if (target !== initialSource) {
+  const initialDurationMs = time;
+  if (options.finalText !== undefined) {
     currentSettings = options.finalSettings ?? settings;
     a = validateSettings(currentSettings);
     random = randomGenerator(a.seed);
@@ -366,17 +309,63 @@ export function createPlan(
     typingTime = 0;
     transition("revision");
     let insertionSeed = a.seed;
-    for (const change of diffText(document, target, options.revisionMode)) {
+    const revisions = planRevisions(
+      document,
+      target,
+      options.revisionMode ?? a.revisionStrategy,
+    );
+    for (const change of revisions) {
+      const operation = change.major
+        ? `Rewriting ${change.kind}`
+        : change.removed && change.inserted
+          ? `Replacing ${change.kind}`
+          : change.removed
+            ? "Removing old passage"
+            : "Adding passage";
       // Revision insertions use their own typing and typo preferences, with each
       // slip corrected before continuing to the next supplied change.
       if (intensity[currentSettings.pauses]) {
-        emit({ type: "thinking" }, base * 0.5);
+        emit({ type: "thinking", operation }, base * 0.5);
         time +=
           ((a.sentenceMinMs + random() * (a.sentenceMaxMs - a.sentenceMinMs)) *
             intensity[currentSettings.pauses]) /
           2;
       }
-      edit({ ...change, inserted: "" });
+      const behavior = change.major
+        ? (a.majorRewrite ?? "insert-first")
+        : "delete-first";
+      if (behavior === "replace") {
+        emit(
+          {
+            type: "replace",
+            index: change.index,
+            deleteCount: change.removed.length,
+            expected: change.removed,
+            text: change.inserted,
+            operation,
+          },
+          base * 1.5,
+        );
+        continue;
+      }
+      const insertionIndex =
+        change.index +
+        (behavior === "insert-first" ? change.removed.length : 0);
+      if (behavior === "delete-first") {
+        emit({ type: "thinking", operation }, 0);
+        // Draft revisions are selected ranges; typo corrections still use their own method.
+        if (change.removed)
+          emit(
+            {
+              type: "delete",
+              index: change.index,
+              text: change.removed,
+              deleteCount: change.removed.length,
+              operation: "Removing old passage",
+            },
+            base * 1.5,
+          );
+      }
       if (change.inserted.trim()) {
         const insertion = createPlan(
           change.inserted,
@@ -388,12 +377,14 @@ export function createPlan(
           const delta = event.scheduledMs - previous;
           previous = event.scheduledMs;
           // Nested stage markers never replace the outer revision stage.
-          if (event.type === "stage") {
+          if (event.type === "stage" || event.type === "verify") {
             time += delta;
             continue;
           }
           const at =
-            event.index === undefined ? undefined : event.index + change.index;
+            event.index === undefined
+              ? undefined
+              : event.index + insertionIndex;
           const editDelay = event.typingMs ?? delta;
           time += delta - editDelay;
           const savedVariation = currentSettings.variation;
@@ -401,7 +392,9 @@ export function createPlan(
           emit(
             {
               type: event.type,
+              operation,
               text: event.text,
+              expected: event.expected,
               index: at,
               deleteCount: event.deleteCount,
               correction: event.correction,
@@ -411,13 +404,25 @@ export function createPlan(
           );
           currentSettings = { ...currentSettings, variation: savedVariation };
         }
-      } else edit({ ...change, removed: "" });
+      } else edit({ ...change, index: insertionIndex, removed: "" });
+      if (behavior === "insert-first" && change.removed) {
+        emit(
+          {
+            type: "delete",
+            index: change.index,
+            text: change.removed,
+            deleteCount: change.removed.length,
+            operation: "Removing old passage",
+          },
+          base * 1.5,
+        );
+      }
     }
     scaleStage(from, start, typingTime, currentSettings);
   }
   let source = target;
   if (options.proofreading?.enabled) {
-    source = normalize(approvedText(target, options.proofreading));
+    source = checkedText(approvedText(target, options.proofreading));
     transition("proofreading");
     emit({ type: "thinking" }, 500);
     for (const change of diffText(document, source)) edit(change);
@@ -425,11 +430,20 @@ export function createPlan(
   if (events.length && time > events[events.length - 1].scheduledMs + 0.001) {
     emit({ type: "thinking" }, 0);
   }
+  emit(
+    { type: "verify", expected: source, operation: "Reviewing document" },
+    0,
+  );
   return {
     events,
     durationMs: time,
     source,
     initialSource,
-    effectiveWpm: settings.wpm,
+    baseWpm: settings.wpm,
+    effectiveWpm: initialDurationMs
+      ? characters(initialSource).length / 5 / (initialDurationMs / 60000)
+      : 0,
+    initialDurationMs,
+    revisionDurationMs: time - initialDurationMs,
   };
 }

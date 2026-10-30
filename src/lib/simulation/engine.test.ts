@@ -77,7 +77,7 @@ describe("simulation engine", () => {
     expect(log.events.reduce(applyEvent, "")).toBe(final);
     expect(log.source).toBe(final);
     expect(log.initialSource).toBe(initial);
-    expect(log.schemaVersion).toBe(2);
+    expect(log.schemaVersion).toBe(3);
   });
   it("rejects empty and whitespace input without creating a timer", () => {
     const { engine, timers } = harness();
@@ -222,17 +222,17 @@ describe("simulation planning", () => {
     expect(custom.durationMs).toBeCloseTo(base.durationMs);
     expect(() =>
       createPlan(base.source, { ...simple, durationSeconds: 1 }),
-    ).toThrow(/20–200/);
+    ).toThrow(/20–300/);
     expect(() =>
       createPlan(base.source, { ...simple, durationSeconds: 100000 }),
-    ).toThrow(/20–200/);
+    ).toThrow(/20–300/);
   });
-  it("validates nonfinite speeds and durations and normalizes Windows line breaks", () => {
+  it("validates nonfinite speeds and durations and preserves Windows line breaks", () => {
     expect(() => createPlan("hello", { ...simple, wpm: NaN })).toThrow();
     expect(() =>
       createPlan("hello", { ...simple, durationSeconds: Infinity }),
     ).toThrow();
-    expect(createPlan("a\r\nb", simple).source).toBe("a\nb");
+    expect(createPlan("a\r\nb", simple).source).toBe("a\r\nb");
   });
   it("rejects inherited property names as intensity values", () => {
     expect(() =>

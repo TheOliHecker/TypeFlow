@@ -18,14 +18,13 @@ import {
 } from "lucide-react";
 import { Brand } from "./brand";
 import { ProofreadingPanel } from "./proofreading-panel";
-import { diffText } from "@/lib/simulation/diff";
+import { planRevisions } from "@/lib/simulation/revisions";
 import { approvedText } from "@/lib/simulation/proofreading";
 import { SettingsPanel } from "./settings-panel";
 import { useDraft } from "@/lib/use-draft";
 import {
   DEFAULT_SETTINGS,
   DEFAULT_PROOFREADING,
-  type RevisionMode,
   formatTime,
   MAX_TEXT_LENGTH,
   SAMPLE_TEXT,
@@ -43,26 +42,23 @@ export function Workspace() {
   const finalText = twoTexts ? (draft.finalText ?? "") : "";
   const finalSettings = draft.finalSettings ?? DEFAULT_SETTINGS;
   const proofreading = draft.proofreading ?? DEFAULT_PROOFREADING;
-  const intendedText = finalText.trim() ? finalText : text;
+  const intendedText = twoTexts ? finalText : text;
   const outputText = useMemo(
     () => approvedText(intendedText, proofreading),
     [intendedText, proofreading],
   );
   const changes = useMemo(
-    () =>
-      twoTexts && finalText.trim()
-        ? diffText(text, finalText, draft.revisionMode)
-        : [],
+    () => (twoTexts ? planRevisions(text, finalText, draft.revisionMode) : []),
     [twoTexts, text, finalText, draft.revisionMode],
   );
   const options = useMemo(
     () => ({
-      finalText,
+      finalText: twoTexts ? finalText : undefined,
       finalSettings,
       revisionMode: draft.revisionMode,
       proofreading,
     }),
-    [finalText, finalSettings, draft.revisionMode, proofreading],
+    [twoTexts, finalText, finalSettings, draft.revisionMode, proofreading],
   );
   const { engine, snapshot } = useSimulation();
   const previous = useSessionMetadata(engine);
@@ -76,7 +72,7 @@ export function Workspace() {
     [engine, snapshot.status],
   );
   const estimate = useMemo(() => {
-    if (!text.trim()) return { ms: 0, error: "" };
+    if (!text.trim() && !twoTexts) return { ms: 0, error: "" };
     try {
       return {
         ms: createPlan(text, settings, undefined, options).durationMs,
@@ -85,7 +81,7 @@ export function Workspace() {
     } catch (e) {
       return { ms: 0, error: (e as Error).message };
     }
-  }, [text, settings, options]);
+  }, [twoTexts, text, settings, options]);
   const firstEstimate = useMemo(() => {
     if (!text.trim()) return { ms: 0, error: "" };
     try {
@@ -95,9 +91,14 @@ export function Workspace() {
     }
   }, [text, settings]);
   const secondEstimate = useMemo(() => {
-    if (!finalText.trim() || !text.trim()) return { ms: 0, error: "" };
+    if (!twoTexts) return { ms: 0, error: "" };
     try {
-      const base = createPlan(text, { ...settings, durationSeconds: null });
+      const base = createPlan(
+        text,
+        { ...settings, durationSeconds: null },
+        undefined,
+        { finalText: text },
+      );
       const combined = createPlan(
         text,
         { ...settings, durationSeconds: null },
@@ -108,20 +109,21 @@ export function Workspace() {
     } catch (e) {
       return { ms: 0, error: (e as Error).message };
     }
-  }, [text, settings, finalText, finalSettings, draft.revisionMode]);
+  }, [twoTexts, text, settings, finalText, finalSettings, draft.revisionMode]);
   const writtenWords = wordCount(snapshot.text);
   const statusText =
     snapshot.status === "running"
       ? snapshot.activity === "thinking"
-        ? "A moment to think"
+        ? (snapshot.operation ?? "A moment to think")
         : snapshot.activity === "correcting"
           ? "Correcting a small slip"
-          : "In the flow"
+          : (snapshot.operation ?? "In the flow")
       : {
           idle: "Ready when you are",
           paused: "Taking a little pause",
           stopped: "Session stopped",
           completed: "All your words, in place",
+          error: snapshot.error ?? "Document verification failed",
         }[snapshot.status];
   useEffect(() => {
     if (snapshot.status === "running")
@@ -315,25 +317,12 @@ export function Workspace() {
                     {finalText.length.toLocaleString()} /{" "}
                     {MAX_TEXT_LENGTH.toLocaleString()} characters
                   </div>
-                  <fieldset disabled={active || !loaded}>
-                    <label className="advanced-field">
-                      Revision mode
-                      <select
-                        value={draft.revisionMode ?? "targeted"}
-                        onChange={(e) => {
-                          engine.reset();
-                          update({
-                            revisionMode: e.target.value as RevisionMode,
-                          });
-                        }}
-                      >
-                        <option value="targeted">Targeted edits</option>
-                        <option value="paragraph">Paragraph rewrites</option>
-                        <option value="full">Full rewrite</option>
-                      </select>
-                    </label>
-                  </fieldset>
-                  {!!finalText.trim() && (
+                  {!finalText.length && (
+                    <p className="setting-hint">
+                      An empty Type 2 draft removes all initial text.
+                    </p>
+                  )}
+                  {twoTexts && (
                     <details className="revision-changes">
                       <summary>
                         {changes.length} planned changes · review draft
@@ -355,6 +344,11 @@ export function Workspace() {
                 </section>
                 <SettingsPanel
                   label="Type 2 · Revision settings"
+                  revisionMode={draft.revisionMode}
+                  onRevisionModeChange={(revisionMode) => {
+                    engine.reset();
+                    update({ revisionMode });
+                  }}
                   settings={finalSettings}
                   disabled={active || !loaded}
                   onChange={(finalSettings) => {
@@ -447,7 +441,11 @@ export function Workspace() {
                 ) : (
                   <button
                     className="button button-primary"
-                    disabled={!loaded || !text.trim() || !!estimate.error}
+                    disabled={
+                      !loaded ||
+                      (!text.trim() && !(twoTexts && finalText.length)) ||
+                      !!estimate.error
+                    }
                     onClick={start}
                   >
                     <Play size={14} fill="currentColor" />{" "}

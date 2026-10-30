@@ -7,6 +7,8 @@ export const TYPO_CATEGORIES = [
   "transposed",
   "additional",
   "spelling",
+  "capitalization",
+  "punctuation",
 ] as const;
 export type TypoCategory = (typeof TYPO_CATEGORIES)[number];
 export type CorrectionTiming =
@@ -14,8 +16,10 @@ export type CorrectionTiming =
   | "word"
   | "sentence"
   | "proofreading";
-export type RevisionMode = "targeted" | "paragraph" | "full";
+export type RevisionMode = "smart" | "targeted" | "paragraph" | "full";
 export type AdvancedSettings = {
+  revisionStrategy?: RevisionMode;
+  majorRewrite?: "delete-first" | "insert-first" | "replace";
   categories: Record<TypoCategory, boolean>;
   probabilities: Record<TypoCategory, number>;
   typoProbability: number | null;
@@ -30,6 +34,8 @@ export type AdvancedSettings = {
   seed: number;
 };
 export const DEFAULT_ADVANCED: AdvancedSettings = {
+  revisionStrategy: "smart",
+  majorRewrite: "insert-first",
   categories: {
     nearby: true,
     missing: true,
@@ -37,6 +43,8 @@ export const DEFAULT_ADVANCED: AdvancedSettings = {
     transposed: true,
     additional: true,
     spelling: true,
+    capitalization: true,
+    punctuation: false,
   },
   probabilities: {
     nearby: 35,
@@ -45,6 +53,8 @@ export const DEFAULT_ADVANCED: AdvancedSettings = {
     transposed: 15,
     additional: 10,
     spelling: 5,
+    capitalization: 8,
+    punctuation: 5,
   },
   typoProbability: null,
   correctionTiming: "word",

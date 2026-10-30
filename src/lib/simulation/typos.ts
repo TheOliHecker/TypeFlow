@@ -35,7 +35,7 @@ export function typoGenerator(
   random: () => number,
   settings: AdvancedSettings,
 ) {
-  let last = "";
+  const recent: string[] = [];
   return (word: string): { text: string; category: TypoCategory } | null => {
     if (!/^[a-z]+$/i.test(word) || word.length < 2) return null;
     const choices = TYPO_CATEGORIES.filter(
@@ -88,12 +88,22 @@ export function typoGenerator(
         text = slips[word.toLowerCase()];
         if (/^[A-Z]/.test(word)) text = text[0].toUpperCase() + text.slice(1);
       }
+      if (category === "capitalization")
+        text =
+          word.slice(0, i) +
+          (letter === letter.toLowerCase()
+            ? letter.toUpperCase()
+            : letter.toLowerCase()) +
+          word.slice(i + 1);
+      if (category === "punctuation")
+        text = word + [",", ".", "’"][Math.floor(random() * 3)];
       const signature =
         category +
         ":" +
         (category === "nearby" || category === "additional" ? neighbor : text);
-      if (text !== word && signature !== last) {
-        last = signature;
+      if (text !== word && !recent.includes(signature)) {
+        recent.push(signature);
+        if (recent.length > 3) recent.shift();
         return { text, category };
       }
     }

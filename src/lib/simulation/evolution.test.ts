@@ -120,7 +120,7 @@ describe("draft evolution", () => {
     expect(replay(plan)).toBe(final);
     expect(
       createPlan(initial, simple, undefined, { finalText: "" }).source,
-    ).toBe(initial);
+    ).toBe("");
   });
   it("matches custom stage durations with pauses and rejects infeasible targets", () => {
     const initial = "A great draft. A second sentence.\n\nAnother paragraph.";
@@ -156,7 +156,7 @@ describe("draft evolution", () => {
     expect(replay(combined)).toBe(final);
     expect(() =>
       createPlan(initial, { ...config, durationSeconds: 1 }),
-    ).toThrow(/20–200/);
+    ).toThrow(/20–300/);
   });
   it("generates repeatable varied slips, with physical keyboard neighbors", () => {
     const config = {
@@ -168,6 +168,8 @@ describe("draft evolution", () => {
         transposed: false,
         additional: false,
         spelling: false,
+        capitalization: false,
+        punctuation: false,
       },
     };
     const typo = typoGenerator(randomGenerator(42), config);

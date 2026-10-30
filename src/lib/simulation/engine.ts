@@ -1,3 +1,4 @@
+import { applyOperation } from "./operations";
 import { type SimulationSettings } from "../types";
 import {
   createPlan,
@@ -7,7 +8,13 @@ import {
   type Stage,
 } from "./plan";
 
-export type Status = "idle" | "running" | "paused" | "stopped" | "completed";
+export type Status =
+  | "idle"
+  | "running"
+  | "paused"
+  | "stopped"
+  | "completed"
+  | "error";
 export type SimulationEvent = Omit<PlanEvent, "scheduledMs" | "type"> & {
   type: PlanEvent["type"] | "start" | "pause" | "resume" | "stop" | "complete";
   atMs: number;
@@ -16,7 +23,13 @@ export type SimulationEvent = Omit<PlanEvent, "scheduledMs" | "type"> & {
   scheduledMs?: number;
 };
 export type SessionLog = {
-  schemaVersion: 1 | 2;
+  schemaVersion: 1 | 2 | 3;
+  metrics?: {
+    baseWpm: number;
+    revisionBaseWpm: number;
+    effectiveWpm: number;
+    durationMs: number;
+  };
   kind: "automated-writing-simulation";
   authorshipNotice: string;
   id: string;
@@ -41,6 +54,8 @@ export type Snapshot = {
   eventCount: number;
   stage: Stage;
   editIndex?: number;
+  operation?: string;
+  error?: string;
 };
 export const IDLE_SNAPSHOT: Snapshot = {
   status: "idle",
@@ -71,15 +86,32 @@ const browserClock: Clock = {
 
 export function applyEvent(
   text: string,
-  event: Pick<SimulationEvent, "type" | "text" | "index" | "deleteCount">,
+  event: Pick<
+    SimulationEvent,
+    "type" | "text" | "index" | "deleteCount" | "expected"
+  >,
 ): string {
   const index =
     event.index ??
     (event.type === "delete" ? Math.max(0, text.length - 1) : text.length);
+  if (event.type === "verify")
+    return applyOperation(text, { type: "verify", expected: event.expected! });
   if (event.type === "insert")
-    return text.slice(0, index) + (event.text ?? "") + text.slice(index);
-  if (event.type === "delete")
-    return text.slice(0, index) + text.slice(index + (event.deleteCount ?? 1));
+    return applyOperation(text, {
+      type: "insert",
+      index,
+      text: event.text ?? "",
+    });
+  if (event.type === "delete" || event.type === "replace")
+    return applyOperation(text, {
+      type: event.type,
+      index,
+      expected:
+        event.expected ??
+        (event.type === "delete" ? event.text : undefined) ??
+        text.slice(index, index + (event.deleteCount ?? 1)),
+      text: event.text ?? "",
+    });
   return text;
 }
 
@@ -156,7 +188,13 @@ export class SimulationEngine {
     this.origin = this.activeOrigin = this.clock.now();
     const startedAt = this.clock.date().toISOString();
     this.log = {
-      schemaVersion: 2,
+      schemaVersion: 3,
+      metrics: {
+        baseWpm: plan.baseWpm,
+        revisionBaseWpm: options.finalSettings?.wpm ?? settings.wpm,
+        effectiveWpm: plan.effectiveWpm,
+        durationMs: plan.durationMs,
+      },
       kind: "automated-writing-simulation",
       authorshipNotice:
         "Automated simulation of supplied text. Event timestamps record actual browser activity; they do not prove original human authorship.",
@@ -176,7 +214,7 @@ export class SimulationEngine {
       ...IDLE_SNAPSHOT,
       status: "running",
       remainingMs: plan.durationMs,
-      currentWpm: plan.effectiveWpm,
+      currentWpm: plan.baseWpm,
     };
     this.record({ type: "start", sourceIndex: 0 });
     this.notify();
@@ -196,6 +234,7 @@ export class SimulationEngine {
     let activity = this.snapshot.activity;
     let stage = this.snapshot.stage;
     let editIndex = this.snapshot.editIndex;
+    let operation = this.snapshot.operation;
     let processed = 0;
     // Bound work after background-tab throttling. All overdue events still retain
     // their actual processing timestamps instead of invented historical times.
@@ -205,7 +244,20 @@ export class SimulationEngine {
       processed < 1000
     ) {
       const event = this.plan.events[this.index++];
-      text = applyEvent(text, event);
+      try {
+        text = applyEvent(text, event);
+      } catch (error) {
+        this.cancel();
+        this.snapshot = {
+          ...this.snapshot,
+          text,
+          status: "error",
+          error: (error as Error).message,
+        };
+        this.notify();
+        return;
+      }
+      operation = event.operation ?? operation;
       sourceIndex = event.sourceIndex;
       stage = event.stage ?? stage;
       if (event.index !== undefined)
@@ -247,6 +299,7 @@ export class SimulationEngine {
       progress: Math.min(99, (this.index / this.plan.events.length) * 100),
       stage,
       editIndex,
+      operation,
       currentWpm,
       activity,
       eventCount: this.log!.events.length,

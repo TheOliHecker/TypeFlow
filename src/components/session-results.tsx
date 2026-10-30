@@ -98,6 +98,16 @@ export function SessionResults({ log }: { log: SessionLog }) {
           </p>
         )}
       </section>
+      {log.metrics && (
+        <p className="replay-note">
+          Base speed: Type 1 {log.metrics.baseWpm} WPM · Type 2{" "}
+          {log.metrics.revisionBaseWpm} WPM. Estimated effective Type 1 speed
+          including pauses and corrections:{" "}
+          {Math.round(log.metrics.effectiveWpm)} WPM. Recorded overall duration
+          including revisions and user pauses:{" "}
+          {formatTime(log.events.at(-1)?.atMs ?? 0)}.
+        </p>
+      )}
       <section className="replay-panel">
         <div className="panel-heading">
           <h2>

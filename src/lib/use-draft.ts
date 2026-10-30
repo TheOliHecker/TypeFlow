@@ -16,7 +16,7 @@ const initial: Draft = {
   mode: "single",
   finalText: "",
   finalSettings: DEFAULT_SETTINGS,
-  revisionMode: "targeted",
+  revisionMode: "smart",
   proofreading: DEFAULT_PROOFREADING,
 };
 type State = { draft: Draft; loaded: boolean };
@@ -50,11 +50,11 @@ export function validateDraft(value: unknown): Draft {
     finalSettings: d.finalSettings
       ? validateDraft({ settings: d.finalSettings }).settings
       : DEFAULT_SETTINGS,
-    revisionMode: ["targeted", "paragraph", "full"].includes(
+    revisionMode: ["smart", "targeted", "paragraph", "full"].includes(
       d.revisionMode ?? "",
     )
       ? d.revisionMode
-      : "targeted",
+      : "smart",
     proofreading: {
       ...DEFAULT_PROOFREADING,
       ...Object.fromEntries(
@@ -79,7 +79,7 @@ export function validateDraft(value: unknown): Draft {
       advanced,
       wpm:
         typeof s?.wpm === "number" && Number.isFinite(s.wpm)
-          ? Math.min(200, Math.max(20, s.wpm))
+          ? Math.min(300, Math.max(20, s.wpm))
           : 45,
       variation: typeof s?.variation === "boolean" ? s.variation : true,
       pauses: s?.pauses && intensities.includes(s.pauses) ? s.pauses : "medium",

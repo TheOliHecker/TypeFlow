@@ -16,6 +16,8 @@ export function SettingsPanel({
   estimateMs,
   durationError,
   label = "Your rhythm",
+  revisionMode,
+  onRevisionModeChange,
 }: {
   settings: SimulationSettings;
   onChange: (s: SimulationSettings) => void;
@@ -23,6 +25,8 @@ export function SettingsPanel({
   estimateMs: number;
   durationError?: string;
   label?: string;
+  revisionMode?: import("@/lib/types").RevisionMode;
+  onRevisionModeChange?: (mode: import("@/lib/types").RevisionMode) => void;
 }) {
   const id = useId();
   const [customPreset, setCustomPreset] = useState(false);
@@ -42,7 +46,8 @@ export function SettingsPanel({
           Speed preset
           <select
             value={
-              !customPreset && [30, 50, 90, 140].includes(settings.wpm)
+              !customPreset &&
+              [30, 50, 90, 140, 220, 300].includes(settings.wpm)
                 ? settings.wpm
                 : "custom"
             }
@@ -56,6 +61,8 @@ export function SettingsPanel({
             <option value="50">Normal · 50 WPM</option>
             <option value="90">Fast · 90 WPM</option>
             <option value="140">Very Fast · 140 WPM</option>
+            <option value="220">Accelerated automation · 220 WPM</option>
+            <option value="300">Accelerated automation · 300 WPM</option>
             <option value="custom">Custom · use slider</option>
           </select>
         </label>
@@ -70,7 +77,7 @@ export function SettingsPanel({
           id={`${id}-wpm`}
           type="range"
           min="20"
-          max="200"
+          max="300"
           value={settings.wpm}
           onChange={(e) => {
             setCustomPreset(true);
@@ -79,7 +86,7 @@ export function SettingsPanel({
         />
         <div className="range-labels">
           <span>20 · Thoughtful</span>
-          <span>200 · In the flow</span>
+          <span>300 · Accelerated automation</span>
         </div>
         <label className="checkbox-label">
           <input
@@ -126,6 +133,51 @@ export function SettingsPanel({
         ))}
         <details className="advanced-settings">
           <summary>Advanced settings</summary>
+          {onRevisionModeChange && (
+            <>
+              <label className="advanced-field">
+                Revision strategy
+                <select
+                  value={revisionMode ?? "smart"}
+                  onChange={(e) =>
+                    onRevisionModeChange(
+                      e.target.value as import("@/lib/types").RevisionMode,
+                    )
+                  }
+                >
+                  <option value="smart">Smart</option>
+                  <option value="targeted">Minimal edits</option>
+                  <option value="paragraph">Paragraph rewrite</option>
+                  <option value="full">Full rewrite</option>
+                </select>
+              </label>
+              <label className="advanced-field">
+                Major rewrite behavior
+                <select
+                  value={a.majorRewrite ?? "insert-first"}
+                  onChange={(e) =>
+                    advanced({
+                      majorRewrite: e.target
+                        .value as AdvancedSettings["majorRewrite"],
+                    })
+                  }
+                >
+                  <option value="delete-first">
+                    Delete first, then insert
+                  </option>
+                  <option value="insert-first">
+                    Insert first, then delete
+                  </option>
+                  <option value="replace">Replace selection</option>
+                </select>
+              </label>
+            </>
+          )}
+          <p className="setting-hint">
+            Timing ranges are customizable simulation choices. Base WPM uses
+            five characters per word; pauses and corrections reduce effective
+            WPM. Session duration also includes revisions.
+          </p>
           <p className="setting-hint">
             Category weights are relative. Frequency controls the chance of a
             slip per word.
@@ -153,6 +205,8 @@ export function SettingsPanel({
                     transposed: "Transposed characters",
                     additional: "Additional characters",
                     spelling: "Spelling slips",
+                    capitalization: "Capitalization errors",
+                    punctuation: "Optional punctuation errors",
                   }[category]
                 }
               </label>
@@ -326,7 +380,7 @@ export function SettingsPanel({
               <p className="setting-hint">
                 {settings.durationSeconds === null
                   ? "A natural estimate. Timing may vary slightly."
-                  : "Custom duration adjusts the base pace within 20–200 WPM. Browser timing may vary."}
+                  : "Custom duration adjusts the base pace within 20–300 WPM. Browser timing may vary."}
               </p>
             )}
           </div>
