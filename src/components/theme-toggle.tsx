@@ -8,8 +8,8 @@ const subscribe = (fn: () => void) => {
 export function ThemeToggle() {
   const theme = useSyncExternalStore(
     subscribe,
-    () => document.documentElement.dataset.theme || "light",
-    () => "light",
+    () => document.documentElement.dataset.theme || "dark",
+    () => "dark",
   );
   return (
     <button

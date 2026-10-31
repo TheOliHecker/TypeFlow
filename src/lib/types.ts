@@ -35,7 +35,7 @@ export type AdvancedSettings = {
 };
 export const DEFAULT_ADVANCED: AdvancedSettings = {
   revisionStrategy: "smart",
-  majorRewrite: "insert-first",
+  majorRewrite: "delete-first",
   categories: {
     nearby: true,
     missing: true,

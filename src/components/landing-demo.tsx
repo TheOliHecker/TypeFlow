@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import {
   ArrowUpRight,
@@ -11,12 +11,18 @@ import {
   RotateCcw,
   SlidersHorizontal,
 } from "lucide-react";
-import { useSimulation } from "@/lib/simulation/use-simulation";
+import { SimulationEngine, IDLE_SNAPSHOT } from "@/lib/simulation/engine";
 import { DEFAULT_SETTINGS, type Intensity } from "@/lib/types";
 const passage =
   "Every great idea begins with a single word.\n\nSometimes, all it takes is a little space to think. A moment to pause. And the freedom to let your words find their own rhythm.\n\nThis is where your story begins.";
 export function LandingDemo() {
-  const { engine, snapshot } = useSimulation();
+  const [engine] = useState(() => new SimulationEngine());
+  const snapshot = useSyncExternalStore(
+    engine.subscribe,
+    engine.getSnapshot,
+    () => IDLE_SNAPSHOT,
+  );
+  useEffect(() => () => engine.dispose(), [engine]);
   const count = snapshot.sourceIndex;
   const playing = snapshot.status === "running";
   const [speed, setSpeed] = useState(45);
@@ -25,6 +31,7 @@ export function LandingDemo() {
   useEffect(() => {
     engine.reset();
     engine.start(passage, { ...DEFAULT_SETTINGS, wpm: speed, pauses, typos });
+    if (matchMedia("(prefers-reduced-motion: reduce)").matches) engine.pause();
   }, [engine, speed, pauses, typos]);
   const restart = () => {
     engine.reset();
@@ -179,7 +186,7 @@ export function LandingDemo() {
           <span className="blue-dot" /> A live little demo. Go ahead, play with
           it.
         </span>
-        <span>Automated simulation · Your words, your authorship</span>
+        <span>Automated preview · Does not establish human authorship</span>
       </div>
     </div>
   );

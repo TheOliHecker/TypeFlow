@@ -207,3 +207,32 @@ describe("draft evolution", () => {
     );
   });
 });
+
+it("never appends a rewritten paragraph before removing the original, even with legacy insert-first preferences", () => {
+  const first =
+    "Okay so honestly I think the project was kind of a mess at first. We did a bunch of stuff and nothing really lined up, you know? ".repeat(
+      8,
+    ) + "\n\nKeep this exact paragraph — café 🧑🏽‍💻.\n";
+  const final =
+    "The project initially lacked clear priorities. Establishing ownership and measurable milestones improved coordination and delivery. ".repeat(
+      6,
+    ) + "\n\nKeep this exact paragraph — café 🧑🏽‍💻.\n";
+  const plan = createPlan(first, DEFAULT_SETTINGS, 42, {
+    finalText: final,
+    finalSettings: {
+      ...DEFAULT_SETTINGS,
+      advanced: { ...DEFAULT_ADVANCED, majorRewrite: "insert-first" },
+    },
+  });
+  let current = "";
+  let removed = false;
+  for (const event of plan.events) {
+    if (event.stage === "revision" && event.type === "delete") removed = true;
+    if (event.stage === "revision" && event.type === "insert")
+      expect(removed).toBe(true);
+    current = applyEvent(current, event);
+    if (event.stage === "revision")
+      expect(current).toContain("Keep this exact paragraph — café 🧑🏽‍💻.");
+  }
+  expect(current).toBe(final);
+});

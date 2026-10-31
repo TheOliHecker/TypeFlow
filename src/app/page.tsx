@@ -1,59 +1,24 @@
 import Link from "next/link";
-import {
-  ArrowDown,
-  ArrowRight,
-  Check,
-  Feather,
-  Fingerprint,
-  Gauge,
-  LockKeyhole,
-  MoveUpRight,
-  RotateCcw,
-  Sparkles,
-  Timer,
-} from "lucide-react";
 import { Brand } from "@/components/brand";
 import { LandingDemo } from "@/components/landing-demo";
 const features = [
-  {
-    icon: Gauge,
-    title: "Find your tempo.",
-    text: "From a thoughtful 20 to a flowing 300 words per minute. Set the pace and let natural variation do the rest.",
-    detail: "YOUR PACE, YOUR PROCESS",
-  },
-  {
-    icon: Timer,
-    title: "Make room for a pause.",
-    text: "Give ideas a moment to breathe. Add thinking pauses and small, automatically corrected typos.",
-    detail: "THE LITTLE DETAILS MATTER",
-  },
-  {
-    icon: RotateCcw,
-    title: "Watch it all unfold. Again.",
-    text: "Replay your session, explore every event, and export your words as a text file or Word document.",
-    detail: "EVERY MOMENT, REPLAYABLE",
-  },
-];
-const faqs = [
   [
-    "What exactly does TypeFlow do?",
-    "TypeFlow takes text you provide and reveals it progressively in a simulated writing environment. You control the typing speed, pauses, and automatic typo corrections, then replay or export the result.",
+    "01",
+    "Scheduled Writing",
+    "Make time for the next draft.",
+    "Define writing windows and separate draft stages. Approved changes run as verified passage checkpoints while Chrome is awake.",
   ],
   [
-    "Is TypeFlow really free?",
-    "TypeFlow is free to use. Local previews need no account. Google Docs output requires the Chrome extension and a Google account.",
+    "02",
+    "Multi-Block",
+    "Every answer in its place.",
+    "Name your blocks, confirm body-text positions, and preview the complete result before writing into an authorized document.",
   ],
   [
-    "Does TypeFlow write or generate my text?",
-    "No. You bring the words. TypeFlow animates how they appear. Simulated activity is always identified as automated and is not proof of human authorship.",
-  ],
-  [
-    "Where is my writing stored?",
-    "Drafts, settings, and recovery checkpoints stay on your device. When you select Google Docs, document content is sent to Google. TypeFlow has no analytics or advertising trackers.",
-  ],
-  [
-    "Can I connect Google Docs?",
-    "Yes, through the TypeFlow Chrome extension. Connect Google, create or select an authorized blank document, review your text, and start. Google controls how edits are grouped in version history.",
+    "03",
+    "Draft Evolution",
+    "Refine the passage. Keep the context.",
+    "Compare drafts, approve major revisions, and replace changed passages at their original positions. Unchanged text stays in place.",
   ],
 ];
 export default function Home() {
@@ -63,200 +28,177 @@ export default function Home() {
         <div className="container nav-inner">
           <Brand />
           <nav aria-label="Main navigation">
-            <a href="#features">Features</a>
+            <a href="#features">Product</a>
             <a href="#how-it-works">How it works</a>
-            <Link href="/install">Chrome extension</Link>
+            <Link href="/help">Help</Link>
           </nav>
-          <Link href="/workspace" className="button button-dark nav-cta">
-            Open workspace <ArrowUpRightIcon />
+          <Link className="button button-primary" href="/install">
+            Get the extension ↗
           </Link>
         </div>
       </header>
       <main id="main">
-        <section className="hero container">
-          <div className="hero-tag">
-            <span className="blue-dot" /> A little more flow. A lot more
-            possibility.<span className="new-tag">FREE TO USE</span>
-          </div>
+        <section className="premium-hero container">
+          <span className="release-label">
+            <span className="blue-dot" /> BUILT FOR GOOGLE DOCS · LOCAL REVIEW
+            BUILD
+          </span>
           <h1>
-            Bring Your Writing
+            Your writing.
             <br />
-            to <span className="hero-italic">Life.</span>
-            <span className="headline-cursor" />
+            <span>Your schedule.</span>
           </h1>
-          <p className="hero-description">
-            Your words. Their own rhythm.
+          <p>
+            Bring your words to Google Docs.
             <br />
-            Turn any text into a natural writing simulation.
-            <br className="mobile-break" /> Set the pace, press play, and watch
-            it flow.
+            Place answers, plan writing windows, and revise drafts with precise
+            control.
           </p>
           <div className="hero-actions">
-            <Link href="/workspace" className="button button-primary">
-              Start Writing — Free <ArrowRight size={17} />
+            <Link href="/install" className="button button-primary">
+              Get the Chrome extension ↗
             </Link>
-            <Link className="button button-quiet" href="/install">
-              Get the Chrome extension <ArrowDown size={15} />
+            <Link href="/workspace" className="button button-quiet">
+              Try the browser demo →
             </Link>
           </div>
-          <div className="hero-reassurance">
-            <span>
-              <Check size={13} /> No sign-up
-            </span>
-            <span>
-              <Check size={13} /> No limits on creativity
-            </span>
-            <span>
-              <Check size={13} /> Just your words
-            </span>
-          </div>
-          <div className="hero-side-note">
-            <svg width="70" height="45" viewBox="0 0 70 45" fill="none">
-              <path
-                d="M4 4C50 0 65 15 44 36M43 24l1 13 13-3"
-                stroke="currentColor"
-                strokeWidth="1.4"
-                strokeLinecap="round"
-              />
-            </svg>
-            <span>
-              less rush,
-              <br />
-              more rhythm.
-            </span>
+          <p className="hero-caption">
+            No paid APIs. No cloud workers. Your document stays in your control.
+          </p>
+        </section>
+        <section
+          className="container product-demo-section"
+          aria-label="Interactive local product demo"
+        >
+          <div className="demo-heading">
+            <span>TYPEFLOW / INTERACTIVE LOCAL PREVIEW</span>
+            <Link href="/workspace">Open demo ↗</Link>
           </div>
           <LandingDemo />
+          <p className="hint">
+            This interactive preview runs locally. Google Docs writing requires
+            the extension and a configured Google connection.
+          </p>
         </section>
-        <section className="trust-strip container">
-          <span>A calmer way to bring words to the screen.</span>
-          <div>
-            <span>
-              <LockKeyhole size={15} /> Private by design
-            </span>
-            <span>
-              <Feather size={15} /> Thoughtfully simple
-            </span>
-            <span>
-              <Fingerprint size={15} /> Honestly automated
-            </span>
-          </div>
-        </section>
-        <section className="section container" id="features">
+        <section className="container section" id="features">
           <div className="section-heading">
             <div>
-              <span className="eyebrow accent">
-                SMALL DETAILS. BETTER FLOW.
-              </span>
+              <span className="eyebrow accent">A CLEARER WAY TO WORK</span>
               <h2>
-                A writing experience
+                From first draft
                 <br />
-                with a rhythm of its own.
+                to exactly where it belongs.
               </h2>
             </div>
             <p>
-              A few thoughtful controls.
-              <br />A whole different feeling.
+              Simple controls.
+              <br />
+              Deliberate execution.
             </p>
           </div>
-          <div className="feature-grid">
-            {features.map(({ icon: Icon, title, text, detail }, i) => (
-              <article className="feature-card" key={title}>
-                <div className={`feature-visual visual-${i}`}>
-                  <Icon size={23} />
-                  {i === 0 ? (
-                    <div className="tempo-lines">
-                      {[16, 24, 37, 49, 60, 45, 31, 42, 55, 34, 20, 14].map(
-                        (h, j) => (
-                          <i key={j} style={{ height: h }} />
-                        ),
-                      )}
-                    </div>
-                  ) : i === 1 ? (
-                    <div className="pause-illustration">
-                      A moment to{" "}
-                      <span>
-                        think
-                        <span className="typing-cursor" />
-                      </span>
-                      <i>…</i>
-                    </div>
-                  ) : (
-                    <div className="replay-illustration">
-                      <span>00:00</span>
-                      <div>
-                        <i />
-                      </div>
-                      <RotateCcw size={18} />
-                      <span>01:24</span>
-                    </div>
-                  )}
-                </div>
-                <span className="eyebrow">{detail}</span>
+          <div className="premium-features">
+            {features.map(([n, label, title, copy]) => (
+              <article key={n}>
+                <span className="feature-number">
+                  {n} / {label}
+                </span>
                 <h3>{title}</h3>
-                <p>{text}</p>
+                <p>{copy}</p>
+                <Link href="/install">Explore in the extension ↗</Link>
               </article>
             ))}
           </div>
         </section>
-        <section className="how-section" id="how-it-works">
-          <div className="container how-layout">
-            <div>
-              <span className="eyebrow accent">FROM TEXT TO MOTION</span>
-              <h2>
-                Three steps.
-                <br />
-                <em>One lovely flow.</em>
-              </h2>
-              <p>
-                No setup. No learning curve.
-                <br />
-                Just a fresh space for your words.
-              </p>
-              <Link href="/workspace" className="text-link">
-                Find your flow <ArrowRight size={16} />
-              </Link>
-            </div>
-            <ol className="steps">
-              {[
-                [
-                  "01",
-                  "Bring your words.",
-                  "Paste a paragraph, a rough draft, or the next big idea. Give it a title and make yourself at home.",
-                ],
-                [
-                  "02",
-                  "Set your rhythm.",
-                  "Pick a typing speed. Add a thinking pause or two. Make the experience feel right for your text.",
-                ],
-                [
-                  "03",
-                  "Press play. Let it unfold.",
-                  "Watch your text come to life. Pause, replay, or take your finished document with you.",
-                ],
-              ].map(([n, title, text]) => (
-                <li key={n}>
-                  <span className="step-number">{n}</span>
-                  <div>
-                    <h3>{title}</h3>
-                    <p>{text}</p>
-                  </div>
-                </li>
-              ))}
-            </ol>
+        <section className="container safety-section">
+          <span className="eyebrow accent">CONFIRMED, NOT ASSUMED</span>
+          <h2>Your document deserves care.</h2>
+          <div className="premium-features">
+            {[
+              [
+                "Review before writing",
+                "Approve the intended result and major revision groups before execution.",
+              ],
+              [
+                "Check every checkpoint",
+                "Conditional Google revisions protect against conflicting edits. Ambiguous writes require reconciliation.",
+              ],
+              [
+                "Recover with context",
+                "A local durable journal records confirmed progress. Interruptions pause work instead of triggering a catch-up batch.",
+              ],
+            ].map(([title, copy]) => (
+              <article key={title}>
+                <h3>{title}</h3>
+                <p>{copy}</p>
+              </article>
+            ))}
           </div>
+          <p className="hint">
+            Real Google OAuth and disposable-document acceptance testing remains
+            a release requirement. Automation does not establish original human
+            authorship.
+          </p>
         </section>
-        <section className="section container faq-section" id="faq">
+        <section className="section container" id="how-it-works">
+          <span className="eyebrow accent">RIGHT BESIDE YOUR DOCUMENT</span>
+          <h2>Set up once. Stay in control.</h2>
+          <ol className="onboarding-steps">
+            {[
+              [
+                "Install the review build",
+                "The Chrome Web Store release is not yet published. Local testers can load the configured extension.",
+              ],
+              [
+                "Connect an authorized document",
+                "Connect Google using the existing drive.file permission, then create or select a supported document.",
+              ],
+              [
+                "Preview, approve, and write",
+                "Choose Write, Draft Evolution, Multi-Block, or Schedule. Review the plan and track confirmed progress.",
+              ],
+            ].map(([t, c], i) => (
+              <li key={t}>
+                <span>0{i + 1}</span>
+                <div>
+                  <h3>{t}</h3>
+                  <p>{c}</p>
+                </div>
+              </li>
+            ))}
+          </ol>
+        </section>
+        <section className="section container faq-section">
           <div>
-            <span className="eyebrow accent">A LITTLE CLARITY</span>
+            <span className="eyebrow accent">THE DETAILS</span>
             <h2>
-              Good questions.
+              Clear expectations.
               <br />
-              Straight answers.
+              Better writing sessions.
             </h2>
-            <p>Less wondering. More writing.</p>
           </div>
           <div className="faq-list">
-            {faqs.map(([q, a]) => (
+            {[
+              [
+                "Does it generate my writing?",
+                "No. You supply and approve every draft. TypeFlow automates entry and revisions; it does not prove human authorship.",
+              ],
+              [
+                "Will schedules run with my computer off?",
+                "No. Your computer must be awake with Chrome running. Missed or interrupted windows need review and rescheduling. Finish times are estimates.",
+              ],
+              [
+                "Can I use a worksheet or table?",
+                "Multi-Block supports confirmed positions in normal Google Docs body text. Tables, drawings, text boxes, nested tabs, PDFs and Slides are unsupported by this release.",
+              ],
+              [
+                "Where is my content stored?",
+                "Drafts, checkpoints and schedules are stored locally. Approved text is sent to Google when you use Docs output. There are no analytics or paid background services.",
+              ],
+              [
+                "Can I install from the Chrome Web Store?",
+                "Publication is pending. The installation page distinguishes local review builds and the future store release.",
+              ],
+            ].map(([q, a]) => (
               <details key={q}>
                 <summary>
                   {q}
@@ -268,39 +210,20 @@ export default function Home() {
           </div>
         </section>
         <section className="bottom-cta container">
-          <div className="cta-spark">
-            <Sparkles size={24} />
-          </div>
-          <span className="eyebrow accent">YOUR NEXT IDEA IS WAITING</span>
-          <h2>Let your words find their flow.</h2>
-          <p>A blank page. A fresh perspective. A little TypeFlow.</p>
-          <Link href="/workspace" className="button button-primary">
-            Start Writing — Free <ArrowRight size={17} />
+          <span className="eyebrow accent">MAKE SPACE FOR THE WORK</span>
+          <h2>A more deliberate writing workflow.</h2>
+          <Link href="/install" className="button button-primary">
+            Get started with the extension ↗
           </Link>
-          <span className="cta-footnote">Free to use. Yours to explore.</span>
         </section>
       </main>
-      <footer className="site-footer container">
-        <div>
-          <Brand />
-          <p>A little more rhythm for your words.</p>
-        </div>
-        <span>
-          Built for words. Designed for you.
-          <br />
-          <small>
-            © {new Date().getFullYear()} TypeFlow · Automated, transparently.
-          </small>
-        </span>
-        <div className="footer-source">
-          <Link href="/install">Install</Link> · <Link href="/help">Help</Link>{" "}
-          · <Link href="/privacy">Privacy</Link> ·{" "}
-          <Link href="/support">Support</Link>
-        </div>
+      <footer className="premium-footer container">
+        <Brand />
+        <span>Your writing. Your schedule.</span>
+        <Link href="/privacy">Privacy</Link>
+        <Link href="/support">Support</Link>
+        <Link href="/help">Documentation</Link>
       </footer>
     </>
   );
-}
-function ArrowUpRightIcon() {
-  return <MoveUpRight size={15} />;
 }

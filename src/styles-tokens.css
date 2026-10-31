@@ -1,0 +1,26 @@
+:root {
+  --obsidian-bg: #0a111d;
+  --obsidian-surface: #151b24;
+  --obsidian-elevated: #1e2632;
+  --obsidian-border: #303948;
+  --obsidian-text: #f5f7fa;
+  --obsidian-secondary: #9aa8b8;
+  --obsidian-accent: #4c9fff;
+  --obsidian-hover: #75b5ff;
+  --obsidian-success: #33c59b;
+  --obsidian-warning: #f5b75e;
+  --obsidian-error: #f07178;
+}
+:root[data-theme="light"] {
+  --obsidian-bg: #f5f7fb;
+  --obsidian-surface: #ffffff;
+  --obsidian-elevated: #eaf0f7;
+  --obsidian-border: #c9d3e0;
+  --obsidian-text: #142135;
+  --obsidian-secondary: #526176;
+  --obsidian-accent: #1765b9;
+  --obsidian-hover: #104d92;
+  --obsidian-success: #13785d;
+  --obsidian-warning: #875314;
+  --obsidian-error: #b33142;
+}

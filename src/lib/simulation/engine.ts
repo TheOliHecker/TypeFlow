@@ -1,3 +1,4 @@
+import { OperationCounter } from "./metrics";
 import { applyOperation } from "./operations";
 import type { SessionCheckpoint } from "./session";
 import { validateSettings, intensity } from "./settings";
@@ -303,6 +304,20 @@ export class SimulationEngine {
     return () => {
       this.listeners.delete(listener);
     };
+  };
+  private metricLog?: SessionLog;
+  private metricIndex = 0;
+  private metricCounter = new OperationCounter();
+  getOperationMetrics = () => {
+    if (this.metricLog !== this.log) {
+      this.metricLog = this.log ?? undefined;
+      this.metricIndex = 0;
+      this.metricCounter = new OperationCounter();
+    }
+    const events = this.log?.events ?? [];
+    const result = this.metricCounter.add(events.slice(this.metricIndex));
+    this.metricIndex = events.length;
+    return result;
   };
   getLog = (): SessionLog | null =>
     this.log ? structuredClone(this.log) : null;
