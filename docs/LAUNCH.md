@@ -2,6 +2,14 @@
 
 Release branch: `codex/production-launch`, based on `codex/google-docs-integration` including `4d35e7d`. Preserve the earlier engine, integration, and local Developer Mode commits when merging into `main`. Never force-push.
 
+The release branch is prepared locally. To publish it for review without changing `main` directly:
+
+```sh
+git push -u origin codex/production-launch
+```
+
+Open a pull request from `codex/production-launch` into `main` in the existing GitHub repository, then follow the publisher/deployment checklist below. No force push is needed.
+
 ## Available release outputs
 
 - `release/typeflow-1.0.0-review.zip`: bundled MV3 extension, local writing and recovery available, Google connection explicitly disabled without publisher configuration. Not a production upload.

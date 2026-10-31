@@ -98,6 +98,10 @@ export class PanelController {
         text: "",
       });
     }
+    if (["running", "paused"].includes(this.engine.getSnapshot().status))
+      throw new Error(
+        "A session is already active. Stop it before starting another.",
+      );
     this.sync?.dispose();
     this.sync = undefined;
     this.failure = "";

@@ -1,4 +1,10 @@
-import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import { createRoot } from "react-dom/client";
 import { SettingsPanel } from "../../src/components/settings-panel";
 import { ProofreadingPanel } from "../../src/components/proofreading-panel";
@@ -71,6 +77,7 @@ function Panel({ controller: c }: { controller: PanelController }) {
   const [nextPage, setNextPage] = useState<string>();
   const [documentId, setDocumentId] = useState("");
   const [busy, setBusy] = useState(false);
+  const actionInFlight = useRef(false);
   const [error, setError] = useState(c.storage.getItem(BACKGROUND_ERROR) ?? "");
   const [background, setBackground] = useState(
     c.storage.getItem("typeflow-background-enabled") !== "false",
@@ -78,6 +85,7 @@ function Panel({ controller: c }: { controller: PanelController }) {
   const [reviewed, setReviewed] = useState(false);
   const [eraseConfirmation, setEraseConfirmation] = useState(false);
   const active = snapshot.status === "running" || snapshot.status === "paused";
+  const syncStatus = c.view.status;
   const synchronizing =
     !!c.sync &&
     ["Writing", "Synchronizing", "Recovering"].includes(c.view.status);
@@ -128,7 +136,8 @@ function Panel({ controller: c }: { controller: PanelController }) {
     setReviewed(false);
   };
   const act = async (action: () => Promise<unknown>) => {
-    if (busy) return;
+    if (actionInFlight.current) return;
+    actionInFlight.current = true;
     setBusy(true);
     setError("");
     try {
@@ -136,6 +145,7 @@ function Panel({ controller: c }: { controller: PanelController }) {
     } catch (e) {
       setError((e as Error).message);
     } finally {
+      actionInFlight.current = false;
       setBusy(false);
       redraw((n) => n + 1);
     }
@@ -165,14 +175,35 @@ function Panel({ controller: c }: { controller: PanelController }) {
     // Check silently on open. Interactive consent only follows a button click.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [c]);
-  const recoverable = c.sessions
-    .list()
-    .filter(
-      (s) =>
-        s.recovery !== "complete" ||
-        (loadBinding(c.storage, s.id) &&
-          !loadBinding(c.storage, s.id)!.complete),
-    );
+  const { recoverable, recoveryIssue } = useMemo(() => {
+    if (
+      ["running", "paused"].includes(snapshot.status) ||
+      busy ||
+      ["Writing", "Synchronizing", "Recovering"].includes(syncStatus)
+    )
+      return { recoverable: [], recoveryIssue: "" };
+    const rows = c.sessions.list().map((saved) => {
+      try {
+        const binding = loadBinding(c.storage, saved.id);
+        return {
+          saved:
+            saved.recovery !== "complete" || (binding && !binding.complete)
+              ? saved
+              : null,
+          damaged: false,
+        };
+      } catch {
+        return { saved, damaged: true };
+      }
+    });
+    return {
+      recoverable: rows.flatMap((row) => (row.saved ? [row.saved] : [])),
+      recoveryIssue: rows.some((row) => row.damaged)
+        ? "A Google recovery checkpoint is damaged. Inspect the document and export your draft before deleting local data."
+        : "",
+    };
+    // Full checkpoint validation runs at lifecycle boundaries, not on each typing frame.
+  }, [c, snapshot.status, busy, syncStatus]);
   const remoteDone = c.view.status.startsWith("Complete");
   return (
     <>
@@ -208,10 +239,10 @@ function Panel({ controller: c }: { controller: PanelController }) {
             {error || c.storageError || snapshot.error || snapshot.storageError}
           </div>
         )}
-        {c.sessions.issues.length > 0 && (
+        {(c.sessions.issues.length > 0 || recoveryIssue) && (
           <p className="error" role="alert">
-            A saved checkpoint is damaged. Export your draft and inspect the
-            Google document. Delete local data to remove unusable checkpoints.
+            {recoveryIssue ||
+              "A saved checkpoint is damaged. Export your draft and inspect the Google document. Delete local data to remove unusable checkpoints."}
           </p>
         )}
         {!active && recoverable.length > 0 && (

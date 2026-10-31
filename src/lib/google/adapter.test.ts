@@ -544,3 +544,70 @@ it("retries explicit quota rejection with bounded backoff and writes the approve
     vi.useRealTimers();
   }
 });
+
+it("rejects malformed or falsely typed Google recovery data with a content-free error", () => {
+  const storage = memoryStorage();
+  for (const raw of [
+    "null",
+    "private writing not valid JSON",
+    JSON.stringify({ ...newBinding("saved", "doc"), complete: "false" }),
+  ]) {
+    storage.setItem("typeflow-google-v1:saved", raw);
+    expect(() => loadBinding(storage, "saved")).toThrow(
+      "Invalid Google recovery checkpoint",
+    );
+  }
+});
+it("does not trust a saved completion flag until the actual approved target is confirmed", async () => {
+  const sync = new GoogleSyncCoordinator(
+    checkpointHost("Approved target"),
+    memoryStorage(),
+    mockGoogle(),
+    { ...newBinding("saved", "doc"), complete: true },
+    () => {},
+  );
+  await expect(sync.initialize()).rejects.toThrow("completion");
+  sync.dispose();
+});
+it("rejects a mismatched write-ahead record before uncertain-write reconciliation", async () => {
+  const google = mockGoogle();
+  const storage = memoryStorage();
+  let lose = true;
+  const transport: GoogleTransport = {
+    async request(action, body) {
+      const result = await google.request(action, body);
+      if (action === "batch" && lose) {
+        lose = false;
+        throw new Error("Lost response");
+      }
+      return result;
+    },
+  };
+  const host = checkpointHost("Approved target");
+  const original = new GoogleSyncCoordinator(
+    host,
+    storage,
+    transport,
+    newBinding("saved", "doc"),
+    () => {},
+  );
+  await original.initialize();
+  await expect(original.synchronizeCheckpoint()).rejects.toThrow();
+  original.dispose();
+  const binding = loadBinding(storage, "saved")!;
+  const key = `typeflow-google-journal:${binding.pending!.id}`;
+  const record = JSON.parse(storage.getItem(key)!);
+  storage.setItem(key, JSON.stringify({ ...record, id: "other-session" }));
+  const restored = new GoogleSyncCoordinator(
+    host,
+    storage,
+    transport,
+    binding,
+    () => {},
+  );
+  await expect(restored.initialize()).rejects.toThrow("journal differs");
+  expect(
+    google.request.mock.calls.filter(([action]) => action === "batch"),
+  ).toHaveLength(1);
+  restored.dispose();
+});

@@ -1,6 +1,39 @@
 # Verification record
 
-Verified locally on October 30, 2026. No public deployment or external account writes were performed.
+## Production release branch — October 30, 2026
+
+Based on `codex/google-docs-integration` through `4d35e7d`. No real Google authorization, external document writes, store submission, or website deployment was performed. The configured production ZIP remains blocked by publisher-owned OAuth/store values; the unconfigured review ZIP is deliberately labeled and has no OAuth client in its manifest.
+
+| Check                                                        | Result                                                                                                                                   |
+| ------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| Next route type generation + TypeScript                      | Passed. Production build also checks TypeScript.                                                                                         |
+| ESLint                                                       | Passed with no errors or warnings.                                                                                                       |
+| Vitest                                                       | **82 tests passed in 13 files.**                                                                                                         |
+| Production website build                                     | Passed with supported `next build --webpack` (`pnpm build`).                                                                             |
+| Actual packaged extension + production website browser suite | **4 Playwright tests passed.** Chromium loads the actual unpacked MV3 package; Google authorization/API responses are mocked where used. |
+| Review extension bundling/ZIP/checksum                       | Passed. `release/typeflow-1.0.0-review.zip`; SHA-256 verification passes.                                                                |
+| Missing production configuration                             | Correctly rejected by the production packager; no fake OAuth ID or falsely configured production ZIP is emitted.                         |
+| Formatting and Git whitespace                                | Checked before final release commit.                                                                                                     |
+| GitHub Actions                                               | Workflow prepared; remote CI has not been run in this session.                                                                           |
+
+### What the automated checks establish
+
+- Existing engine, deterministic plans/revisions, exact Unicode and paragraph output, pause/resume/stop, replay, input validation, proofreading approvals, checkpoint validation, and Developer Mode authorization tests remain passing.
+- Google range compilation covers all revision modes and rewrite methods. Conditional revisions, collaborator conflicts, final-text mismatch diagnostics, explicit quota backoff, authorization errors, uncertain-response reconciliation, and duplicate-write prevention are tested with mocked Google APIs.
+- Extension storage tests verify durable barriers, queued write failures/retry, and newest-checkpoint preservation. Corrupt recovery data, false completion flags, and mismatched write-ahead records fail closed. Background worker tests verify saved-progress-only synchronization, exclusive ownership with the panel, and conflict handling. These tests do not establish real Chrome alarm delivery or Google API availability.
+- Browser checks cover public install/help/privacy/support navigation; local web writing and deletion; production 404 isolation for Developer Mode and web OAuth; extension Single Text/Draft Evolution; pause, close/reopen, paused restore/resume; exact local output and TXT download; 320 px overflow; and rejection of unconfigured OAuth.
+- The packaged Google browser workflow uses mocked Chrome authorization and Docs/Drive APIs. It confirms a lost acknowledgement is reconciled with one actual mocked write, nonempty-document starts are rejected, and collaborator content is preserved on conflict. This does not pass real OAuth/API acceptance.
+- Store screenshots are actual local extension UI captures at 1280×800. The 128 px icon, 440×280 tile, and 1400×560 marquee were generated and visually inspected. No screenshot is presented as proof of a live Google connection.
+
+### External acceptance still required
+
+Complete every checkbox in [Google setup and real-account acceptance](google-docs-setup.md), including consent/cancellation, stable extension/OAuth identity, actual progressive and revision writes, account expiry/revocation, network interruption, background alarms/restart, collaborator conflicts, and final-text comparison in disposable Google documents. Verify the toolbar's native side-panel opening in the configured desktop Chrome installation. Complete Google/store review and test the deployed website/live store installation. Nothing here guarantees Google version-history timing or grouping.
+
+### Build environment
+
+Node.js 24, pnpm 11.25.0, Next.js 16.4.3, Playwright 1.64.1. This desktop sandbox blocks Turbopack's local CSS compiler socket, including an escalated retry. The release uses the supported webpack builder; it passed. Browser tests required local-server/Chromium process access. Build artifacts contain bundled local code and dependency license notices; they exclude server/developer code, environment files, private credentials, and source maps.
+
+The records below describe earlier milestones, retained for context.
 
 ## Simulation Engine 2.0 verification
 

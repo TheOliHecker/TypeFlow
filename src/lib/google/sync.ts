@@ -47,14 +47,23 @@ export function loadBinding(
 ): GoogleBinding | null {
   const raw = storage.getItem(key(id));
   if (!raw) return null;
-  const b = JSON.parse(raw) as GoogleBinding;
+  let b: GoogleBinding;
+  try {
+    b = JSON.parse(raw) as GoogleBinding;
+  } catch {
+    throw new Error(
+      "Invalid Google recovery checkpoint. Inspect the Google document before clearing local recovery data.",
+    );
+  }
   if (
+    !b ||
     b.version !== 1 ||
     b.sessionId !== id ||
     typeof b.documentId !== "string" ||
     typeof b.confirmedText !== "string" ||
     !Number.isInteger(b.confirmedIndex) ||
     b.confirmedIndex < 0 ||
+    (b.complete !== undefined && typeof b.complete !== "boolean") ||
     !Array.isArray(b.activity)
   )
     throw new Error(
@@ -156,6 +165,8 @@ export class GoogleSyncCoordinator {
           !Number.isInteger(pending.end) ||
           pending.end <= this.binding.confirmedIndex ||
           pending.end > checkpoint.index ||
+          pending.id !==
+            `${checkpoint.sessionId}:google:${this.binding.confirmedIndex}-${pending.end}` ||
           !Array.isArray(pending.batch)
         )
           throw new Error("Invalid pending Google recovery batch.");
@@ -182,6 +193,17 @@ export class GoogleSyncCoordinator {
         const pending = this.binding.pending,
           record = await this.journal.load(pending.id);
         if (record) {
+          if (
+            record.id !== pending.id ||
+            JSON.stringify(record.operation) !==
+              JSON.stringify(pending.operation) ||
+            record.before.text !== this.binding.confirmedText ||
+            record.afterText !==
+              applyOperation(this.binding.confirmedText, pending.operation)
+          )
+            throw new Error(
+              "Google recovery journal differs from its saved checkpoint.",
+            );
           const result = await this.executor.reconcile(record);
           if (result.state === "confirmed")
             this.confirm(pending, result.afterText);
@@ -196,6 +218,15 @@ export class GoogleSyncCoordinator {
       } else if (remote.text !== this.binding.confirmedText)
         throw new Error(
           "Google document changed outside TypeFlow. No changes were overwritten.",
+        );
+      if (
+        this.binding.complete &&
+        (remote.text !== checkpoint.target ||
+          this.binding.confirmedIndex !== checkpoint.index ||
+          checkpoint.snapshot.progress !== 100)
+      )
+        throw new Error(
+          "Saved completion does not match the approved final document. Reconciliation requires attention.",
         );
       this.save();
       await this.durable();
