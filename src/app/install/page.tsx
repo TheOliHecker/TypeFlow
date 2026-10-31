@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { ProductPage } from "@/components/product-page";
 export const metadata = { title: "Install TypeFlow" };
@@ -15,6 +16,7 @@ export default function InstallPage() {
       intro="Use the TypeFlow Chrome extension for Google Docs, or try the local web workspace first."
     >
       <section>
+        <span className="pill">LOCAL REVIEW BUILD · STORE RELEASE PENDING</span>
         <h2>Get the Chrome extension</h2>
         {store ? (
           <a
@@ -49,8 +51,8 @@ export default function InstallPage() {
             authorized for TypeFlow.
           </li>
           <li>
-            Choose Single Text or Draft Evolution. Paste your words, set your
-            rhythm, review the approved text, and start.
+            Choose Write, Draft Evolution, Multi-Block, or Schedule. Paste your
+            words, set your rhythm, review the approved text, and start.
           </li>
         </ol>
         <p>
@@ -58,6 +60,36 @@ export default function InstallPage() {
             Read the complete writing and recovery guide →
           </Link>
         </p>
+      </section>
+      <section className="installation-preview">
+        <div>
+          <h2>A focused panel beside your work.</h2>
+          <p>
+            Actual extension review build, showing a local Draft Evolution
+            session. Google writing requires the configured OAuth connection.
+          </p>
+          <p>
+            Switch between Write, Draft Evolution, Multi-Block and Schedule.
+            Review before starting, then follow confirmed progress.
+          </p>
+        </div>
+        <figure>
+          <Image
+            src="/extension-review.png"
+            alt="Actual TypeFlow review extension with document selection and compact writing mode navigation"
+            width={440}
+            height={900}
+            style={{
+              width: "100%",
+              height: 520,
+              objectFit: "cover",
+              objectPosition: "top",
+            }}
+          />
+          <figcaption>
+            Review build · local preview · actual interface
+          </figcaption>
+        </figure>
       </section>
       <section>
         <h2>Try it in this browser</h2>
@@ -84,6 +116,25 @@ export default function InstallPage() {
           requires a build configured by the publisher with the matching
           extension OAuth client.
         </p>
+      </section>
+      <section>
+        <h2>Connection & scheduling checklist</h2>
+        <p>
+          Google sign-in needs a matching Chrome extension OAuth client, a
+          stable extension ID, and an authorized Google account. Review builds
+          without that configuration support local previews only.
+        </p>
+        <p>
+          Keep your computer awake and Chrome running for scheduled writing. If
+          a window is missed, open Schedule, inspect the document, and choose a
+          new window for the remaining checkpoints.
+        </p>
+        <p>
+          Multi-Block currently supports normal body text. Tables, drawings and
+          visual cursor selection are unsupported. If sign-in fails, reconnect
+          Google and check that the build matches the registered extension ID.
+        </p>
+        <Link href="/support">Get support →</Link>
       </section>
       <p className="honesty-note">
         TypeFlow automates text you supply. It does not generate text or prove

@@ -1,10 +1,14 @@
 # TypeFlow
 
-TypeFlow is a Manifest V3 Chrome side panel for progressively writing supplied text into Google Docs, with Single Text and Draft Evolution modes, controlled pacing, checked revisions, exact final-text verification, and local interruption recovery. The Next.js website provides installation/help/privacy/support pages and a local preview/export workspace.
+TypeFlow is a Manifest V3 Chrome side panel for progressively writing supplied text into Google Docs, with Write, Draft Evolution, Multi-Block and Scheduled Writing modes, controlled pacing, checked revisions, exact final-text verification, and local interruption recovery. The Next.js website provides installation/help/privacy/support pages and a local preview/export workspace.
 
 **TypeFlow automates text you provide. It does not generate writing or establish human authorship. Google controls version-history grouping and timing.**
 
 This release preserves the integration work through `4d35e7d`. Public distribution still requires the publisher’s real extension OAuth client, Chrome Web Store identity, and real-account acceptance testing. No placeholder OAuth IDs are compiled into release functionality.
+
+## Premium upgrade review
+
+See the [upgrade and validation report](docs/UPGRADE_REPORT.md), [scheduling and placement guide](docs/SCHEDULING_AND_PLACEMENT.md), and [brand readiness report](docs/BRAND_READINESS.md). Scheduled work uses local verified passage checkpoints while Chrome runs on an awake computer. Placement supports user-confirmed normal body-text offsets; tables, drawings and visual cursor mapping are unsupported. Real Google OAuth and disposable-document acceptance remain launch requirements.
 
 ## Develop and verify
 

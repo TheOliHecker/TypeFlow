@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
 import { ThemeToggle } from "@/components/theme-toggle";
 import "./globals.css";
+import "./premium.css";
 
 export const metadata: Metadata = {
   title: {
-    default: "TypeFlow — Bring Your Writing to Life",
+    default: "TypeFlow — Your writing. Your schedule.",
     template: "%s · TypeFlow",
   },
   description:
@@ -18,7 +19,7 @@ export default function RootLayout({
       <body>
         <script
           dangerouslySetInnerHTML={{
-            __html: `try{let t=localStorage.getItem('typeflow-theme');document.documentElement.dataset.theme=t||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light')}catch{}`,
+            __html: `try{let t=localStorage.getItem('typeflow-theme');document.documentElement.dataset.theme=t||'dark'}catch{}`,
           }}
         />
         <a className="skip-link" href="#main">

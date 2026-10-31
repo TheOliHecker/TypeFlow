@@ -1,3 +1,4 @@
+import { PRODUCT } from "../lib/brand";
 import Link from "next/link";
 export function Brand() {
   return (
@@ -7,7 +8,8 @@ export function Brand() {
         <i />
         <i />
       </span>
-      TypeFlow<span className="brand-dot">.</span>
+      {PRODUCT.name}
+      <span className="brand-dot">.</span>
     </Link>
   );
 }

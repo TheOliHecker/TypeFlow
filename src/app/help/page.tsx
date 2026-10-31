@@ -42,8 +42,9 @@ export default function HelpPage() {
         </p>
         <p>
           Review the final text and planned changes, then check the review box.
-          New sessions require a blank plain-text document. TypeFlow rejects
-          existing writing, complex layouts, lists, tables, embedded objects,
+          Write and Draft Evolution start in a blank plain-text document.
+          Multi-Block and Schedule can use existing supported body text.
+          TypeFlow rejects complex layouts, lists, tables, embedded objects,
           suggested edits, and multiple or nested tabs. Use a fresh document for
           each new session.
         </p>
@@ -92,14 +93,61 @@ export default function HelpPage() {
         </p>
       </section>
       <section>
+        <h2>Multi-Block placement</h2>
+        <p>
+          Select an authorized document, choose Multi-Block, and read the
+          document. The position guide labels paragraph starts using zero-based
+          UTF-16 offsets. Name each answer, enter its text, and choose the
+          offset before which to insert it. Add a newline to your block when
+          needed to separate it from a question.
+        </p>
+        <p>
+          Preview the exact final document and approve the placements. Blocks
+          execute from the bottom upward so earlier positions remain stable. To
+          correct a target before starting, edit the offset and preview again.
+          After execution begins, stop, inspect the actual document, and make a
+          new plan from a fresh read. Tables, drawings and visual editor
+          selection are unsupported.
+        </p>
+      </section>
+      <section>
+        <h2>Scheduled Writing</h2>
+        <p>
+          Choose Schedule and read the current document. Add named stages with
+          approved resulting text, date and time windows, pace and pauses.
+          Review the timeline and revision groups, then approve and save. Each
+          later stage revises the preceding draft in place; the draft remains
+          during the break.
+        </p>
+        <p>
+          Chrome must run on an awake computer. Verified passage checkpoints run
+          approximately every 30 seconds or farther apart, depending on your
+          window. This mode uses passage edits rather than character-level
+          background typing. Exact completion times are estimates. The displayed
+          timezone and saved absolute times keep existing schedules fixed when
+          the device timezone changes; ambiguous daylight-saving times require a
+          different selection.
+        </p>
+        <p>
+          Use Pause schedule or Emergency stop / cancel to prevent future work.
+          A submitted Google request may still finish. If the browser restarts,
+          a checkpoint is missed, or Google needs attention, inspect the
+          document and use Edit / recover remaining schedule to select a future
+          window. Recovery reconciles uncertain writes first and combines
+          remaining work into the selected window. It does not silently catch up
+          missed work.
+        </p>
+      </section>
+      <section>
         <h2>Background synchronization</h2>
         <p>
           With “Finish saved synchronization” enabled, Chrome can send already
           saved progress after the panel closes. It does not generate new
-          writing while the panel is closed. Chrome can delay alarms or suspend
-          work; a closed browser, sleeping computer, offline device, revoked
-          access, or storage error can prevent synchronization. Reopen and
-          restore to continue. Pause and Stop disable new background writes.
+          writing while the panel is closed. Scheduled Writing is a separate,
+          explicitly approved alarm-driven mode. Chrome can delay alarms or
+          suspend work; a closed browser, sleeping computer, offline device,
+          revoked access, or storage error can prevent synchronization. Reopen
+          and restore to continue. Pause and Stop disable new background writes.
         </p>
       </section>
       <section>

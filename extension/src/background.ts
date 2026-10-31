@@ -1,3 +1,4 @@
+import { tickJob, interruptRunningJob } from "./jobs";
 import { SimulationEngine } from "../../src/lib/simulation/engine";
 import { BrowserSessionStorage } from "../../src/lib/simulation/session";
 import { GoogleSyncCoordinator, loadBinding } from "../../src/lib/google/sync";
@@ -11,7 +12,10 @@ import {
 
 const ALARM = "typeflow-checkpoint-sync";
 async function ensureAlarm() {
-  await chrome.alarms.create(ALARM, { periodInMinutes: 0.5 });
+  for (const name of [ALARM, "typeflow-scheduled-writing"]) {
+    if (!chrome.alarms.get || !(await chrome.alarms.get(name)))
+      await chrome.alarms.create(name, { periodInMinutes: 0.5 });
+  }
 }
 chrome.runtime.onInstalled.addListener(() => {
   void chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
@@ -19,6 +23,7 @@ chrome.runtime.onInstalled.addListener(() => {
   void ensureAlarm();
 });
 chrome.runtime.onStartup.addListener(() => {
+  void interruptRunningJob();
   void ensureAlarm();
 });
 /** No source text, token, or detailed upstream error is ever logged. */
@@ -73,9 +78,16 @@ export async function synchronizeSavedCheckpoint() {
   );
 }
 chrome.alarms.onAlarm.addListener((alarm) => {
+  if (alarm.name === "typeflow-scheduled-writing")
+    void tickJob().catch(() => {
+      void chrome.action.setBadgeText({ text: "!" });
+    });
   if (alarm.name === ALARM)
     void synchronizeSavedCheckpoint().catch(() => {
       // A local storage failure cannot safely be repaired by writing remotely.
       void chrome.action.setBadgeText({ text: "!" });
     });
 });
+
+// Recreate alarms on worker initialization too (Chrome 120 compatibility).
+void ensureAlarm();

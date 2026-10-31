@@ -1,3 +1,4 @@
+@import "../../src/styles-tokens.css";
 :root {
   color-scheme: light dark;
   --bg: #f7f8fa;
@@ -509,4 +510,166 @@ footer {
   color: var(--muted);
   font-size: 11px;
   padding: 12px 0 4px;
+}
+/* Shared Obsidian Blue tokens; extension identity and permissions are unchanged. */
+:root {
+  --bg: var(--obsidian-bg);
+  --paper: var(--obsidian-surface);
+  --ink: var(--obsidian-text);
+  --muted: var(--obsidian-secondary);
+  --line: var(--obsidian-border);
+  --accent: var(--obsidian-accent);
+  --soft: var(--obsidian-elevated);
+  --danger: var(--obsidian-error);
+  color-scheme: dark;
+}
+body {
+  min-width: 0;
+  font-size: 14px;
+}
+main {
+  padding: 18px;
+  max-width: 720px;
+  margin: auto;
+}
+h1 {
+  font-size: 26px;
+  letter-spacing: -0.04em;
+  line-height: 1.2;
+}
+h2 {
+  font-size: 17px;
+  letter-spacing: -0.025em;
+}
+.card {
+  border-radius: 12px;
+  padding: 18px;
+}
+input,
+select,
+textarea {
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+  background: var(--bg);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+button {
+  min-height: 44px;
+  transition:
+    transform 150ms,
+    background 150ms;
+}
+button.primary {
+  color: var(--bg);
+}
+button:hover {
+  transform: translateY(-1px);
+}
+.mode-nav {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  margin: 20px 0;
+}
+.mode-nav button {
+  font-size: 13px;
+  padding: 10px 6px;
+}
+.mode-nav button[aria-pressed="true"] {
+  background: var(--soft);
+  color: var(--accent);
+  border-color: var(--accent);
+}
+.block-editor {
+  padding: 16px 0;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 16px;
+}
+.job-preview,
+.job-status {
+  padding: 16px 0;
+  border-top: 1px solid var(--line);
+  margin-top: 20px;
+}
+.review,
+.paper {
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  max-width: 100%;
+  font-size: 14px;
+}
+.actions {
+  flex-wrap: wrap;
+}
+.check {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 0;
+}
+.revision-document {
+  white-space: pre-wrap;
+  padding: 12px;
+  background: var(--bg);
+  border-radius: 8px;
+  overflow-wrap: anywhere;
+}
+ins {
+  color: var(--obsidian-success);
+  background: #33c59b15;
+  text-decoration: none;
+}
+del {
+  color: var(--danger);
+  background: #f0717815;
+}
+.pill {
+  white-space: normal;
+}
+.hint,
+small {
+  font-size: 12px;
+  line-height: 1.65;
+}
+button:focus-visible,
+input:focus-visible,
+summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+.metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.metrics span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+h1,
+.paper,
+.review-text {
+  font-family: inherit;
+}
+.error {
+  background: color-mix(in srgb, var(--danger) 10%, var(--paper));
+  border-color: var(--danger);
+}
+.pill.good {
+  background: color-mix(in srgb, var(--obsidian-success) 10%, var(--paper));
+  color: var(--obsidian-success);
 }

@@ -73,7 +73,7 @@ export function validateSettings(settings: SimulationSettings) {
       a.revisionStrategy ?? "smart",
     ) ||
     !["delete-first", "insert-first", "replace"].includes(
-      a.majorRewrite ?? "insert-first",
+      a.majorRewrite ?? "delete-first",
     )
   )
     throw new Error("Choose valid revision preferences.");

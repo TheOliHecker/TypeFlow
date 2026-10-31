@@ -38,7 +38,7 @@ describe("Core Engine 3.0 revisions", () => {
       },
     ]);
   });
-  it("groups a substantial sentence rewrite and supports all three behaviors", () => {
+  it("groups sentence rewrites and safely migrates legacy insert-first settings", () => {
     const old = "The old approach takes too much time. ",
       next = "Our new design offers a completely different solution. ";
     const before = "Keep this. " + old + "Keep that.",
@@ -62,13 +62,11 @@ describe("Core Engine 3.0 revisions", () => {
         const first = revision.find(
           (e) => e.type === "insert" || e.type === "delete",
         )!;
-        expect(first.type).toBe(
-          behavior === "insert-first" ? "insert" : "delete",
-        );
+        expect(first.type).toBe("delete");
       }
     }
   });
-  it("renders the replacement progressively beside the original, then leaves one replacement", () => {
+  it("removes the original range before progressively writing its replacement", () => {
     const old = "A slow process wastes our effort.",
       next = "Modern tools bring fresh possibilities to everyone.";
     const plan = rewrite(old, next);
@@ -80,7 +78,7 @@ describe("Core Engine 3.0 revisions", () => {
       if (event.stage === "revision" && event.type === "insert")
         expect(Array.from(event.text!).length).toBe(1);
     }
-    expect(coexisted).toBe(true);
+    expect(coexisted).toBe(false);
     expect(text).toBe(next);
   });
   it("preserves exact targets across paragraphs, reorderings, empty drafts and Unicode", () => {

@@ -1,3 +1,4 @@
+import { controlJob, readJob } from "./jobs";
 import { SimulationEngine } from "../../src/lib/simulation/engine";
 import { BrowserSessionStorage } from "../../src/lib/simulation/session";
 import {
@@ -75,6 +76,11 @@ export class PanelController {
   ) {
     if (["running", "paused"].includes(this.engine.getSnapshot().status))
       throw new Error("Stop the current session before starting another.");
+    const job = await readJob();
+    if (job && !["complete", "cancelled"].includes(job.status))
+      throw new Error(
+        "Cancel the scheduled job before starting another session.",
+      );
     const options = {
       finalText: draft.mode === "two" ? (draft.finalText ?? "") : undefined,
       finalSettings: draft.finalSettings,
@@ -161,12 +167,14 @@ export class PanelController {
     await this.storage.flush();
   }
   async erase() {
+    await controlJob("cancel");
     await this.pause(true);
     this.sync?.dispose();
     this.sync = undefined;
     this.engine.reset();
     this.storage.clear();
     await this.storage.flush();
+    await chrome.storage.local.clear();
   }
   async discard(id: string) {
     const binding = loadBinding(this.storage, id);

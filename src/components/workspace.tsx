@@ -1,4 +1,5 @@
 "use client";
+import { RevisionPreview } from "./revision-preview";
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -126,7 +127,7 @@ export function Workspace() {
       return { ms: 0, error: (e as Error).message };
     }
   }, [twoTexts, text, settings, finalText, finalSettings, draft.revisionMode]);
-  const writtenWords = wordCount(snapshot.text);
+
   const statusText =
     snapshot.status === "running"
       ? snapshot.activity === "thinking"
@@ -151,7 +152,18 @@ export function Workspace() {
     if (snapshot.status === "running")
       cursor.current?.scrollIntoView({ block: "nearest" });
   }, [snapshot.text, snapshot.status]);
+  const [revisionApproval, setRevisionApproval] = useState("");
+  const revisionSignature = text + "\u0000" + finalText;
+  const metrics = engine.getOperationMetrics();
   const start = () => {
+    if (
+      twoTexts &&
+      changes.some((c) => c.major) &&
+      revisionApproval !== revisionSignature
+    ) {
+      setError("Review and approve each major revision group first.");
+      return;
+    }
     setError("");
     try {
       void google.start(() =>
@@ -190,9 +202,12 @@ export function Workspace() {
               A LITTLE SPACE FOR YOUR WORDS
             </span>
             <h1>
-              Find your flow<span className="accent">.</span>
+              Writing workspace<span className="accent">.</span>
             </h1>
-            <p>Bring your words. Set the rhythm. Let them unfold.</p>
+            <p>
+              A local demo. Your real Google Docs workflows live in the
+              extension.
+            </p>
           </div>
           <span className="draft-status">
             <Check size={13} />{" "}
@@ -222,7 +237,7 @@ export function Workspace() {
         )}
         {!active &&
           !googleWorking &&
-          recoverable.map((saved) => (
+          recoverable.slice(0, 1).map((saved) => (
             <section className="restore-note" key={saved.id}>
               <p>
                 <strong>{saved.log.title}</strong> · {saved.stage} ·{" "}
@@ -547,17 +562,14 @@ export function Workspace() {
                         {changes.length} planned changes · review draft
                         evolution
                       </summary>
-                      {changes.length ? (
-                        changes.map((c, i) => (
-                          <div key={i}>
-                            <small>Position {c.index}</small>
-                            {c.removed && <del>{c.removed}</del>}
-                            {c.inserted && <ins>{c.inserted}</ins>}
-                          </div>
-                        ))
-                      ) : (
-                        <p>Both drafts match; no revision needed.</p>
-                      )}
+                      <RevisionPreview
+                        key={revisionSignature}
+                        before={text}
+                        after={finalText}
+                        onApproval={(approved) =>
+                          setRevisionApproval(approved ? revisionSignature : "")
+                        }
+                      />
                     </details>
                   )}
                 </section>
@@ -778,9 +790,10 @@ export function Workspace() {
               </div>
               <div className="stats-grid">
                 <div>
-                  <span>WORDS WRITTEN</span>
+                  <span>FINAL DOCUMENT WORDS</span>
                   <strong>
-                    {writtenWords} <small>/ {wordCount(outputText)}</small>
+                    {wordCount(snapshot.text)}{" "}
+                    <small>/ {wordCount(outputText)} target</small>
                   </strong>
                 </div>
                 <div>
@@ -798,13 +811,16 @@ export function Workspace() {
                   </strong>
                 </div>
                 <div>
-                  <span>CURRENT PACE</span>
-                  <strong>
-                    {snapshot.currentWpm || "—"} <small>WPM</small>
-                  </strong>
+                  <span>OPERATIONS COMPLETED</span>
+                  <strong>{snapshot.eventCount}</strong>
                 </div>
               </div>
             </section>
+            <p className="setting-hint">
+              {metrics.inserted} words inserted · {metrics.removed} words
+              removed · {metrics.operations} operations completed · stage:{" "}
+              {snapshot.stage}
+            </p>
             {completedLog && (
               <SessionResults key={completedLog.id} log={completedLog} />
             )}

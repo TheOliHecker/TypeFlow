@@ -166,7 +166,7 @@ export function SettingsPanel({
                 <label className="advanced-field">
                   Major rewrite behavior
                   <select
-                    value={a.majorRewrite ?? "insert-first"}
+                    value={a.majorRewrite ?? "delete-first"}
                     onChange={(e) =>
                       advanced({
                         majorRewrite: e.target
@@ -177,9 +177,7 @@ export function SettingsPanel({
                     <option value="delete-first">
                       Delete first, then insert
                     </option>
-                    <option value="insert-first">
-                      Insert first, then delete
-                    </option>
+
                     <option value="replace">Replace selection</option>
                   </select>
                 </label>

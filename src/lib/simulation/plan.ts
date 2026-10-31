@@ -356,7 +356,9 @@ export function createPlan(
           2;
       }
       const behavior = change.major
-        ? (a.majorRewrite ?? "insert-first")
+        ? a.majorRewrite === "replace"
+          ? "replace"
+          : "delete-first"
         : "delete-first";
       if (behavior === "replace") {
         emit(
@@ -372,9 +374,7 @@ export function createPlan(
         );
         continue;
       }
-      const insertionIndex =
-        change.index +
-        (behavior === "insert-first" ? change.removed.length : 0);
+      const insertionIndex = change.index;
       if (behavior === "delete-first") {
         emit({ type: "thinking", operation }, 0);
         // Draft revisions are selected ranges; typo corrections still use their own method.
@@ -436,18 +436,6 @@ export function createPlan(
           currentSettings = { ...currentSettings, variation: savedVariation };
         }
       } else edit({ ...change, index: insertionIndex, removed: "" });
-      if (behavior === "insert-first" && change.removed) {
-        emit(
-          {
-            type: "delete",
-            index: change.index,
-            text: change.removed,
-            deleteCount: change.removed.length,
-            operation: "Removing old passage",
-          },
-          base * 1.5,
-        );
-      }
     }
     scaleStage(from, start, typingTime, currentSettings);
   }

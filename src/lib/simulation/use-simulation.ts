@@ -26,6 +26,7 @@ export function useSimulation() {
   );
   const release = useRef<(() => void) | null>(null);
   const mounted = useRef(false);
+  const acquiring = useRef(false);
   const snapshot = useSyncExternalStore(
     engine.subscribe,
     engine.getSnapshot,
@@ -113,6 +114,8 @@ export function useSimulation() {
         throw new Error(
           "This browser cannot safely lock local sessions. Use a browser with Web Locks support.",
         );
+      if (acquiring.current) return;
+      acquiring.current = true;
       await new Promise<void>((resolve, reject) => {
         void navigator.locks
           .request(
@@ -135,6 +138,7 @@ export function useSimulation() {
                 release.current = unlock;
                 try {
                   action();
+                  acquiring.current = false;
                   resolve();
                 } catch (error) {
                   release.current = null;
@@ -148,6 +152,8 @@ export function useSimulation() {
       });
     } catch (error) {
       setRecoveryError((error as Error).message);
+    } finally {
+      acquiring.current = false;
     }
   };
   const discard = (id?: string) => {

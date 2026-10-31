@@ -8,19 +8,39 @@ test("public site: install/help/privacy, local writing, deletion and production 
   page,
   request,
 }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
   await page.goto("/");
+  await expect(page.locator(".demo-paper p")).toContainText("Every great", {
+    timeout: 10000,
+  });
+  await page.getByRole("button", { name: "Pause demo", exact: true }).click();
+  await page.screenshot({
+    path: "docs/screenshots/home-after.png",
+    fullPage: true,
+  });
   await expect(
-    page.getByRole("link", { name: "Chrome extension", exact: true }),
+    page.getByRole("link", { name: "Get the extension ↗", exact: true }),
   ).toBeVisible();
   await page.goto("/install");
   await expect(page.getByRole("heading", { level: 1 })).toContainText(
     "Your words",
   );
+  await page.screenshot({
+    path: "docs/screenshots/install-after.png",
+    fullPage: true,
+  });
   for (const route of ["/help", "/privacy", "/support"]) {
     await page.goto(route);
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
   }
   await page.goto("/workspace");
+  await expect(
+    page.getByLabel("Text to simulate", { exact: true }),
+  ).toBeEnabled();
+  await page.screenshot({
+    path: "docs/screenshots/workspace-after.png",
+    fullPage: true,
+  });
   await page.getByLabel("Text to simulate", { exact: true }).fill("Test 😀.");
   await page
     .getByRole("combobox", { name: "Speed preset", exact: true })
@@ -82,7 +102,7 @@ async function panelPage(context: BrowserContext, id: string) {
   const page = await context.newPage();
   await page.goto(`chrome-extension://${id}/sidepanel.html`);
   await expect(
-    page.getByRole("heading", { name: "Find your flow." }),
+    page.getByRole("heading", { name: "Your writing, in control." }),
   ).toBeVisible();
   return page;
 }
@@ -98,6 +118,7 @@ test("real MV3 package: local single/evolution, pause, interrupted recovery, exp
     await page
       .getByRole("textbox", { name: "Your text", exact: true })
       .fill("A short initial draft. 😀");
+    await page.locator(".settings-disclosure > summary").click();
     await page
       .getByRole("combobox", { name: "Speed preset", exact: true })
       .selectOption("300");
@@ -148,10 +169,16 @@ test("real MV3 package: local single/evolution, pause, interrupted recovery, exp
     await restored
       .getByRole("textbox", { name: /^Final draft/ })
       .fill("A revised final draft! 😀");
+    await restored.locator(".settings-disclosure > summary").click();
     await restored
       .getByRole("combobox", { name: "Speed preset", exact: true })
       .nth(1)
       .selectOption("300");
+    await restored.getByText("Preview approved final text").click();
+    for (const box of await restored
+      .getByRole("checkbox", { name: /^Approve / })
+      .all())
+      await box.check();
     await restored.getByRole("checkbox", { name: "I reviewed" }).check();
     await restored
       .getByRole("button", { name: "Start writing", exact: true })
@@ -310,6 +337,7 @@ test("packaged Google workflow with mocked authorization/API: conditional writes
     await page
       .getByRole("textbox", { name: "Your text", exact: true })
       .fill("Exact 😀 text.");
+    await page.locator(".settings-disclosure > summary").click();
     await page
       .getByRole("combobox", { name: "Speed preset", exact: true })
       .selectOption("300");
@@ -364,4 +392,219 @@ test("packaged Google workflow with mocked authorization/API: conditional writes
     await context.close();
     await rm(profile, { recursive: true, force: true });
   }
+});
+
+test("placement and multi-stage schedule UI: previews, approval, persistence, cancel and narrow layout (mocked Google reads)", async () => {
+  const { context, id, profile } = await extensionContext();
+  try {
+    await context.addInitScript(() => {
+      const manifest = chrome.runtime.getManifest();
+      chrome.runtime.getManifest = () => ({
+        ...manifest,
+        oauth2: {
+          client_id: "mock-only",
+          scopes: ["https://www.googleapis.com/auth/drive.file"],
+        },
+      });
+      chrome.identity.getAuthToken = (async () => ({
+        token: "mock-token",
+        grantedScopes: ["https://www.googleapis.com/auth/drive.file"],
+      })) as typeof chrome.identity.getAuthToken;
+    });
+    await context.route("https://www.googleapis.com/drive/v3/files?*", (r) =>
+      r.fulfill({ json: { files: [{ id: "doc", name: "Worksheet" }] } }),
+    );
+    const source = "Question 1\n\nQuestion 2\n";
+    await context.route("https://docs.googleapis.com/v1/documents/**", (r) =>
+      r.fulfill({
+        json: {
+          documentId: "doc",
+          revisionId: "r1",
+          body: {
+            content: [
+              {
+                startIndex: 1,
+                endIndex: source.length + 2,
+                paragraph: {
+                  elements: [
+                    {
+                      startIndex: 1,
+                      endIndex: source.length + 2,
+                      textRun: { content: source + "\n" },
+                    },
+                  ],
+                },
+              },
+            ],
+          },
+        },
+      }),
+    );
+    const page = await panelPage(context, id);
+    await page
+      .getByRole("combobox", { name: "Authorized document", exact: true })
+      .selectOption("doc");
+    await page
+      .getByRole("button", { name: "Multi-Block", exact: true })
+      .click();
+    await page
+      .getByRole("button", { name: "Read selected document", exact: true })
+      .click();
+    await page.locator(".block-editor textarea").fill("First answer\n");
+    await page.getByLabel("Insert before offset").fill("11");
+    await page.getByRole("button", { name: "Add block", exact: true }).click();
+    await page.locator(".block-editor textarea").nth(1).fill("Second answer\n");
+    await page
+      .getByLabel("Insert before offset")
+      .nth(1)
+      .fill(String(source.length));
+    await page
+      .getByRole("button", { name: "Preview operations", exact: true })
+      .click();
+    await expect(page.locator(".job-preview .review")).toHaveText(
+      "Question 1\nFirst answer\n\nQuestion 2\nSecond answer\n",
+    );
+    await expect(
+      page.getByRole("button", { name: "Confirm placements & start" }),
+    ).toBeDisabled();
+    await page.setViewportSize({ width: 320, height: 900 });
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+    ).toBe(true);
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await page.screenshot({
+      path: "docs/screenshots/extension-placement.png",
+      fullPage: true,
+    });
+    await page.getByRole("button", { name: "Schedule", exact: true }).click();
+    await page
+      .getByRole("button", { name: "Read selected document", exact: true })
+      .click();
+    await page
+      .getByLabel("Approved document at end of stage")
+      .fill(source + "Draft one.");
+    await page.getByRole("button", { name: "Add stage", exact: true }).click();
+    await page
+      .getByLabel("Approved document at end of stage")
+      .nth(1)
+      .fill(source + "Final draft.");
+    await page
+      .getByRole("button", { name: "Preview operations", exact: true })
+      .click();
+    await page.getByRole("checkbox", { name: "I approve all" }).check();
+    await page
+      .getByRole("button", { name: "Save schedule", exact: true })
+      .click();
+    await expect(page.locator(".job-status")).toContainText("scheduled");
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await page.screenshot({
+      path: "docs/screenshots/extension-schedule.png",
+      fullPage: true,
+    });
+    await page.reload();
+    await page.getByRole("button", { name: "Schedule", exact: true }).click();
+    await expect(page.locator(".job-status")).toContainText("scheduled");
+    await page
+      .getByRole("button", { name: "Pause schedule", exact: true })
+      .click();
+    await expect(page.locator(".job-status")).toContainText("paused");
+    await page
+      .getByRole("button", { name: "Emergency stop / cancel", exact: true })
+      .click();
+    await expect(page.locator(".job-status")).toContainText("cancelled");
+  } finally {
+    await context.close();
+    await rm(profile, { recursive: true, force: true });
+  }
+});
+
+test("homepage demo leaves no recovery checkpoint; workspace lock releases on tab close and themes fit mobile", async ({
+  page,
+  context,
+}) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Pause demo", exact: true }).click();
+  expect(
+    await page.evaluate(
+      () =>
+        Object.keys(localStorage).filter((k) =>
+          k.startsWith("typeflow-checkpoint-v1:"),
+        ).length,
+    ),
+  ).toBe(0);
+  await page.goto("/workspace");
+  await page
+    .getByLabel("Text to simulate", { exact: true })
+    .fill(
+      "A deliberately long writing session to check ownership across tabs.",
+    );
+  await page
+    .getByRole("button", { name: "Start writing", exact: true })
+    .click();
+  await expect(
+    page.getByRole("button", { name: "Pause", exact: true }),
+  ).toBeVisible();
+  await page.close();
+  const next = await context.newPage();
+  await next.goto("/workspace");
+  await next.getByRole("button", { name: "Resume saved session" }).click();
+  await expect(next.getByText("already open in another tab")).toHaveCount(0);
+  await next.setViewportSize({ width: 375, height: 900 });
+  expect(
+    await next.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+  await next.getByRole("button", { name: "Switch to light theme" }).click();
+  await expect(next.locator("html")).toHaveAttribute("data-theme", "light");
+});
+
+test("website Draft Evolution requires major-group approval and preserves unchanged passages", async ({
+  page,
+}) => {
+  await page.goto("/workspace");
+  await page
+    .getByLabel("Text to simulate", { exact: true })
+    .fill("The old process wastes time. Keep this unchanged — café 😀.");
+  await page.getByLabel("Simulation mode").selectOption("two");
+  const final =
+    "A modern workflow establishes clear priorities. Keep this unchanged — café 😀.";
+  await page.getByLabel("Final draft", { exact: true }).fill(final);
+  await page
+    .getByRole("combobox", { name: "Speed preset", exact: true })
+    .first()
+    .selectOption("300");
+  await page
+    .getByRole("combobox", { name: "Speed preset", exact: true })
+    .nth(1)
+    .selectOption("300");
+  await page
+    .getByRole("button", { name: "Start writing", exact: true })
+    .click();
+  await expect(
+    page.getByRole("alert").filter({ hasText: "approve each major" }),
+  ).toBeVisible();
+  await page.getByText(/planned changes · review draft evolution/).click();
+  await expect(page.locator(".revision-document")).toContainText(
+    "Keep this unchanged — café 😀.",
+  );
+  for (const box of await page
+    .getByRole("checkbox", { name: /^Approve / })
+    .all())
+    await box.check();
+  await page.screenshot({
+    path: "docs/screenshots/revision-preview.png",
+    fullPage: true,
+  });
+  await page
+    .getByRole("button", { name: "Start writing", exact: true })
+    .click();
+  await expect(
+    page.getByText("Complete · All your words, in place"),
+  ).toBeVisible({ timeout: 30000 });
+  await expect(page.getByLabel("Simulated document preview")).toContainText(
+    final,
+  );
 });
