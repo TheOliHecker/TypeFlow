@@ -8,13 +8,18 @@
   },
   "scripts": {
     "dev": "next dev --hostname 127.0.0.1",
-    "build": "next build",
+    "build": "next build --webpack",
     "start": "next start --hostname 127.0.0.1",
     "lint": "eslint .",
     "typecheck": "next typegen && tsc --noEmit",
     "test": "vitest run",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "extension:build": "node scripts/build-extension.mjs",
+    "extension:review": "node scripts/build-extension.mjs --review",
+    "test:browser": "playwright test",
+    "check": "pnpm typecheck && pnpm lint && pnpm test && pnpm build && pnpm extension:review",
+    "store:assets": "node scripts/store-assets.mjs"
   },
   "dependencies": {
     "docx": "^9.6.1",
@@ -24,10 +29,13 @@
     "react-dom": "19.3.1"
   },
   "devDependencies": {
+    "@playwright/test": "^1.64.1",
     "@tailwindcss/postcss": "4.3.3",
+    "@types/chrome": "^0.3.7",
     "@types/node": "^24.10.0",
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
+    "esbuild": "^0.28.2",
     "eslint": "^9.39.0",
     "eslint-config-next": "16.4.3",
     "prettier": "3.8.4",

@@ -1,6 +1,6 @@
-# Planned Google Docs integration
+# Google Docs integration design (historical)
 
-This release has **no Google OAuth or Docs API implementation**. No credentials are required. The contracts in `src/lib/integrations/google-docs.ts` define a future boundary; they are not a connected service.
+The original design below is retained for architectural context. **The current implementation is the MV3 extension**, with Chrome-managed OAuth, per-file document access, durable checkpoint synchronization and reconciliation. See [current setup and real-account acceptance](google-docs-setup.md) and [launch instructions](LAUNCH.md). Statements about unimplemented features below describe the earlier prototype, not the current release branch.
 
 ## Authorization and document creation
 
@@ -10,7 +10,7 @@ After authorization, ask the user to create a document for a clearly labeled aut
 
 ## Real-time writing and quotas
 
-An authorized session coordinator consumes current simulation actions and serializes remote writes. Do not call Google for every simulated character. Combine contiguous edits into small, ordered batches under a configurable per-user/project rate limiter. Honor the current project quotas, `Retry-After`, and bounded exponential backoff with jitter. Do not hard-code a claim that remote edits can keep pace at 120 WPM. If API/network latency prevents the requested timing, communicate the delay and pause or slow the remote session.
+An authorized session coordinator consumes current simulation actions and serializes remote writes. Do not call Google for every simulated character. Combine contiguous edits into small, ordered batches under a configurable per-user/project rate limiter. Honor the current project quotas, `Retry-After`, and bounded exponential backoff with jitter. Do not hard-code a claim that remote edits can keep pace at 200 WPM. If API/network latency prevents the requested timing, communicate the delay and pause or slow the remote session.
 
 Track remote progress separately from the local preview. A local simulation event does not establish that an API edit succeeded. Remote text may be chunked and should be identified as automated. See [batch requests](https://developers.google.com/workspace/docs/api/how-tos/batch) and [usage limits](https://developers.google.com/workspace/docs/api/limits).
 
@@ -27,3 +27,9 @@ Record actual local `sentAt` and `acknowledgedAt` times for each request. They a
 ## Before shipping
 
 Implement and test OAuth revocation, minimum scopes, conflict detection, quota exhaustion, uncertain writes, token storage, retry limits, cancellation, and disconnect recovery. Integration tests should use a dedicated Google test account and disposable documents. This architecture does not authorize any live account activity.
+
+## Simulation Engine 2.0 event boundary
+
+Schema 2 sessions emit positioned `insert` and `delete` events plus `stage` markers (`draft`, `revision`, `proofreading`). Positions and deletion lengths use zero-based UTF-16 offsets in the current plain-text document, before each event; translate these to the destination tab's Docs indices in the adapter. A delete's `text` describes removed content; use `deleteCount` for its range. Retain event order, including earlier-document edits. Stage and thinking events do not write content. Temporary slips carry `correction`; approved proofreading edits are regular edits in the proofreading stage. `typingMs` records planned edit effort, while `timestamp`/`atMs` record actual observation and `scheduledMs` is only a local deadline.
+
+Use session ID plus event ordinal for ordered operation IDs. Read new events from the engine's cloned log on notifications, retaining a consumer cursor; never send replay events to Docs. `source` is the final approved output; `initialSource` and `options` retain draft evolution inputs. Existing authorization, checkpoint and reconciliation requirements still apply. No synchronization is implemented in this phase.

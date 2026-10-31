@@ -63,7 +63,7 @@ export function LandingDemo() {
             aria-label="Demo typing speed"
             type="range"
             min={20}
-            max={120}
+            max={200}
             value={speed}
             onChange={(e) => setSpeed(+e.target.value)}
           />

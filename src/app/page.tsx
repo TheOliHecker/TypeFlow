@@ -18,7 +18,7 @@ const features = [
   {
     icon: Gauge,
     title: "Find your tempo.",
-    text: "From a thoughtful 20 to a flowing 120 words per minute. Set the pace and let natural variation do the rest.",
+    text: "From a thoughtful 20 to a flowing 300 words per minute. Set the pace and let natural variation do the rest.",
     detail: "YOUR PACE, YOUR PROCESS",
   },
   {
@@ -41,7 +41,7 @@ const faqs = [
   ],
   [
     "Is TypeFlow really free?",
-    "Yes. All current features are free, with no account, subscription, or paid API required. Everything runs in your browser.",
+    "TypeFlow is free to use. Local previews need no account. Google Docs output requires the Chrome extension and a Google account.",
   ],
   [
     "Does TypeFlow write or generate my text?",
@@ -49,11 +49,11 @@ const faqs = [
   ],
   [
     "Where is my writing stored?",
-    "Your draft and preferences are saved in this browser’s local storage. They are not sent to a server. Full session event logs stay in memory unless you download them.",
+    "Drafts, settings, and recovery checkpoints stay on your device. When you select Google Docs, document content is sent to Google. TypeFlow has no analytics or advertising trackers.",
   ],
   [
     "Can I connect Google Docs?",
-    "Not yet. A future integration is planned for authorized Google Docs edits with real timestamps and clear automation labels. Today you can export a DOCX or TXT file.",
+    "Yes, through the TypeFlow Chrome extension. Connect Google, create or select an authorized blank document, review your text, and start. Google controls how edits are grouped in version history.",
   ],
 ];
 export default function Home() {
@@ -65,7 +65,7 @@ export default function Home() {
           <nav aria-label="Main navigation">
             <a href="#features">Features</a>
             <a href="#how-it-works">How it works</a>
-            <a href="#faq">FAQs</a>
+            <Link href="/install">Chrome extension</Link>
           </nav>
           <Link href="/workspace" className="button button-dark nav-cta">
             Open workspace <ArrowUpRightIcon />
@@ -95,9 +95,9 @@ export default function Home() {
             <Link href="/workspace" className="button button-primary">
               Start Writing — Free <ArrowRight size={17} />
             </Link>
-            <a className="button button-quiet" href="#preview">
-              See it in action <ArrowDown size={15} />
-            </a>
+            <Link className="button button-quiet" href="/install">
+              Get the Chrome extension <ArrowDown size={15} />
+            </Link>
           </div>
           <div className="hero-reassurance">
             <span>
@@ -292,9 +292,11 @@ export default function Home() {
             © {new Date().getFullYear()} TypeFlow · Automated, transparently.
           </small>
         </span>
-        <Link href="/workspace" className="footer-source">
-          Find your flow <MoveUpRight size={13} />
-        </Link>
+        <div className="footer-source">
+          <Link href="/install">Install</Link> · <Link href="/help">Help</Link>{" "}
+          · <Link href="/privacy">Privacy</Link> ·{" "}
+          <Link href="/support">Support</Link>
+        </div>
       </footer>
     </>
   );

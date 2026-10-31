@@ -1,0 +1,39 @@
+{
+  "manifest_version": 3,
+  "name": "TypeFlow \u2014 Writing in motion",
+  "description": "Bring your text to Google Docs with controlled pacing, draft revisions, verified synchronization, and local recovery.",
+  "version": "1.0.0",
+  "minimum_chrome_version": "120",
+  "permissions": ["sidePanel", "storage", "identity", "alarms"],
+  "host_permissions": [
+    "https://docs.googleapis.com/*",
+    "https://www.googleapis.com/*",
+    "https://oauth2.googleapis.com/*"
+  ],
+  "oauth2": {
+    "scopes": ["https://www.googleapis.com/auth/drive.file"]
+  },
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "side_panel": {
+    "default_path": "sidepanel.html"
+  },
+  "action": {
+    "default_title": "Open TypeFlow",
+    "default_icon": {
+      "16": "icons/16.png",
+      "32": "icons/32.png"
+    }
+  },
+  "icons": {
+    "16": "icons/16.png",
+    "32": "icons/32.png",
+    "48": "icons/48.png",
+    "128": "icons/128.png"
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'none'; connect-src https://docs.googleapis.com https://www.googleapis.com https://oauth2.googleapis.com"
+  }
+}

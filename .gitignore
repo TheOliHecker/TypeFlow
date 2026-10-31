@@ -7,3 +7,11 @@ coverage/
 !.env.example
 .DS_Store
 .qa/
+
+release/typeflow-*/
+release/*.zip
+release/*.sha256
+playwright-report/
+test-results/
+
+.pnpm-store/

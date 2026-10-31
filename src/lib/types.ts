@@ -1,16 +1,105 @@
 export const MAX_TEXT_LENGTH = 100_000;
 export type Intensity = "off" | "low" | "medium" | "high";
+export const TYPO_CATEGORIES = [
+  "nearby",
+  "missing",
+  "repeated",
+  "transposed",
+  "additional",
+  "spelling",
+  "capitalization",
+  "punctuation",
+] as const;
+export type TypoCategory = (typeof TYPO_CATEGORIES)[number];
+export type CorrectionTiming =
+  | "immediate"
+  | "word"
+  | "sentence"
+  | "proofreading";
+export type RevisionMode = "smart" | "targeted" | "paragraph" | "full";
+export type AdvancedSettings = {
+  revisionStrategy?: RevisionMode;
+  majorRewrite?: "delete-first" | "insert-first" | "replace";
+  categories: Record<TypoCategory, boolean>;
+  probabilities: Record<TypoCategory, number>;
+  typoProbability: number | null;
+  correctionTiming: CorrectionTiming;
+  correctionMethod: "backspace" | "replace";
+  sentenceMinMs: number;
+  sentenceMaxMs: number;
+  paragraphMinMs: number;
+  paragraphMaxMs: number;
+  longerBreaks: boolean;
+  variationPercent: number;
+  seed: number;
+};
+export const DEFAULT_ADVANCED: AdvancedSettings = {
+  revisionStrategy: "smart",
+  majorRewrite: "insert-first",
+  categories: {
+    nearby: true,
+    missing: true,
+    repeated: true,
+    transposed: true,
+    additional: true,
+    spelling: true,
+    capitalization: true,
+    punctuation: false,
+  },
+  probabilities: {
+    nearby: 35,
+    missing: 20,
+    repeated: 15,
+    transposed: 15,
+    additional: 10,
+    spelling: 5,
+    capitalization: 8,
+    punctuation: 5,
+  },
+  typoProbability: null,
+  correctionTiming: "word",
+  correctionMethod: "backspace",
+  sentenceMinMs: 500,
+  sentenceMaxMs: 1500,
+  paragraphMinMs: 1200,
+  paragraphMaxMs: 3000,
+  longerBreaks: false,
+  variationPercent: 35,
+  seed: 42,
+};
+export type ProofreadingSettings = {
+  enabled: boolean;
+  spelling: boolean;
+  grammar: boolean;
+  punctuation: boolean;
+  style: boolean;
+  approvedIds: string[];
+};
+export const DEFAULT_PROOFREADING: ProofreadingSettings = {
+  enabled: false,
+  spelling: true,
+  grammar: true,
+  punctuation: true,
+  style: false,
+  approvedIds: [],
+};
 export type SimulationSettings = {
   wpm: number;
   variation: boolean;
   pauses: Intensity;
   typos: Intensity;
   durationSeconds: number | null;
+  advanced?: AdvancedSettings;
 };
 export type Draft = {
   title: string;
   text: string;
   settings: SimulationSettings;
+  mode?: "single" | "two";
+  finalText?: string;
+  finalSettings?: SimulationSettings;
+  revisionMode?: RevisionMode;
+  proofreading?: ProofreadingSettings;
 };
 export const DEFAULT_SETTINGS: SimulationSettings = {
   wpm: 45,

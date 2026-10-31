@@ -2,15 +2,22 @@
 import { useEffect, useReducer, useRef, useState } from "react";
 import {
   DEFAULT_SETTINGS,
+  DEFAULT_PROOFREADING,
   MAX_TEXT_LENGTH,
   SAMPLE_TEXT,
   type Draft,
   type SimulationSettings,
 } from "./types";
+import { validateSettings } from "./simulation/plan";
 const initial: Draft = {
   title: "A little room to think",
   text: SAMPLE_TEXT,
   settings: DEFAULT_SETTINGS,
+  mode: "single",
+  finalText: "",
+  finalSettings: DEFAULT_SETTINGS,
+  revisionMode: "smart",
+  proofreading: DEFAULT_PROOFREADING,
 };
 type State = { draft: Draft; loaded: boolean };
 type Action =
@@ -21,16 +28,58 @@ export function validateDraft(value: unknown): Draft {
   if (!value || typeof value !== "object") return initial;
   const d = value as Partial<Draft>;
   const s = d.settings as Partial<SimulationSettings> | undefined;
+  let advanced: SimulationSettings["advanced"];
+  try {
+    if (s?.advanced)
+      advanced = validateSettings({
+        ...DEFAULT_SETTINGS,
+        advanced: s.advanced,
+      });
+  } catch {}
   return {
     title: typeof d.title === "string" ? d.title.slice(0, 120) : initial.title,
     text:
       typeof d.text === "string"
         ? d.text.slice(0, MAX_TEXT_LENGTH).replace(/\r\n?/g, "\n")
         : initial.text,
+    mode: d.mode === "two" ? "two" : "single",
+    finalText:
+      typeof d.finalText === "string"
+        ? d.finalText.slice(0, MAX_TEXT_LENGTH).replace(/\r\n?/g, "\n")
+        : "",
+    finalSettings: d.finalSettings
+      ? validateDraft({ settings: d.finalSettings }).settings
+      : DEFAULT_SETTINGS,
+    revisionMode: ["smart", "targeted", "paragraph", "full"].includes(
+      d.revisionMode ?? "",
+    )
+      ? d.revisionMode
+      : "smart",
+    proofreading: {
+      ...DEFAULT_PROOFREADING,
+      ...Object.fromEntries(
+        Object.keys(DEFAULT_PROOFREADING)
+          .filter((key) => key !== "approvedIds")
+          .map((key) => [
+            key,
+            typeof d.proofreading?.[
+              key as keyof typeof DEFAULT_PROOFREADING
+            ] === "boolean"
+              ? d.proofreading[key as keyof typeof DEFAULT_PROOFREADING]
+              : DEFAULT_PROOFREADING[key as keyof typeof DEFAULT_PROOFREADING],
+          ]),
+      ),
+      approvedIds: Array.isArray(d.proofreading?.approvedIds)
+        ? d.proofreading.approvedIds.filter(
+            (id): id is string => typeof id === "string",
+          )
+        : [],
+    },
     settings: {
+      advanced,
       wpm:
         typeof s?.wpm === "number" && Number.isFinite(s.wpm)
-          ? Math.min(120, Math.max(20, s.wpm))
+          ? Math.min(300, Math.max(20, s.wpm))
           : 45,
       variation: typeof s?.variation === "boolean" ? s.variation : true,
       pauses: s?.pauses && intensities.includes(s.pauses) ? s.pauses : "medium",

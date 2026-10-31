@@ -52,6 +52,33 @@ describe("simulation engine", () => {
     expect(engine.getSnapshot().text).toBe(text);
     expect(engine.getSnapshot().progress).toBe(100);
   });
+  it("pauses during revision and reconstructs the complete staged session", () => {
+    const { engine, advance, finish } = harness();
+    const initial = "An initial draft.",
+      final = "A revised initial draft!";
+    const options = {
+      finalText: final,
+      finalSettings: { ...simple, wpm: 200 },
+    };
+    const plan = createPlan(initial, simple, undefined, options);
+    const boundary = plan.events.find(
+      (e) => e.type === "stage" && e.stage === "revision",
+    )!;
+    engine.start(initial, simple, "Evolution", options);
+    advance(boundary.scheduledMs + 100);
+    expect(engine.getSnapshot().stage).toBe("revision");
+    engine.pause();
+    const paused = engine.getSnapshot();
+    advance(10000);
+    expect(engine.getSnapshot()).toEqual(paused);
+    engine.resume();
+    finish();
+    const log = engine.getLog()!;
+    expect(log.events.reduce(applyEvent, "")).toBe(final);
+    expect(log.source).toBe(final);
+    expect(log.initialSource).toBe(initial);
+    expect(log.schemaVersion).toBe(3);
+  });
   it("rejects empty and whitespace input without creating a timer", () => {
     const { engine, timers } = harness();
     for (const text of ["", " \n\t"])
@@ -104,9 +131,7 @@ describe("simulation engine", () => {
     finish();
     const events = engine.getLog()!.events;
     expect(events.filter((e) => e.type === "delete").length).toBeGreaterThan(0);
-    expect(
-      events.filter((e) => e.correction && e.type === "insert").length,
-    ).toBe(events.filter((e) => e.type === "delete").length);
+    expect(events.some((e) => e.typoCategory)).toBe(true);
     expect(engine.getSnapshot().text).toBe(source);
   });
   it("reconstructs exact output solely from recorded events", () => {
@@ -197,17 +222,17 @@ describe("simulation planning", () => {
     expect(custom.durationMs).toBeCloseTo(base.durationMs);
     expect(() =>
       createPlan(base.source, { ...simple, durationSeconds: 1 }),
-    ).toThrow(/20–120/);
+    ).toThrow(/20–300/);
     expect(() =>
       createPlan(base.source, { ...simple, durationSeconds: 100000 }),
-    ).toThrow(/20–120/);
+    ).toThrow(/20–300/);
   });
-  it("validates nonfinite speeds and durations and normalizes Windows line breaks", () => {
+  it("validates nonfinite speeds and durations and preserves Windows line breaks", () => {
     expect(() => createPlan("hello", { ...simple, wpm: NaN })).toThrow();
     expect(() =>
       createPlan("hello", { ...simple, durationSeconds: Infinity }),
     ).toThrow();
-    expect(createPlan("a\r\nb", simple).source).toBe("a\nb");
+    expect(createPlan("a\r\nb", simple).source).toBe("a\r\nb");
   });
   it("rejects inherited property names as intensity values", () => {
     expect(() =>

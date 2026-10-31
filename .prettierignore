@@ -4,3 +4,10 @@ pnpm-lock.yaml
 coverage
 .qa
 next-env.d.ts
+
+.pnpm-store
+release/typeflow-*
+release/*.zip
+release/*.sha256
+playwright-report
+test-results
