@@ -82,6 +82,7 @@ export class GoogleSyncCoordinator {
     private update: (view: SyncView) => void,
     private scheduler: Scheduler = new ForegroundScheduler(),
     private intervalMs = 30_000,
+    private durable: () => Promise<void> = async () => {},
   ) {
     this.binding = structuredClone(binding);
     this.journal = {
@@ -94,6 +95,7 @@ export class GoogleSyncCoordinator {
           `typeflow-google-journal:${record.id}`,
           JSON.stringify(record),
         );
+        await this.durable();
       },
     };
     this.adapter = new GoogleDocsOutputAdapter(transport, {
@@ -196,6 +198,7 @@ export class GoogleSyncCoordinator {
           "Google document changed outside TypeFlow. No changes were overwritten.",
         );
       this.save();
+      await this.durable();
       this.failed = false;
       this.view(
         this.binding.complete ? "Complete · exact match verified" : "Ready",
@@ -286,6 +289,7 @@ export class GoogleSyncCoordinator {
     this.view("Synchronizing");
     try {
       this.engine.checkpoint();
+      await this.durable();
       if (this.engine.getSnapshot().storageError)
         throw new Error(
           "Save the local checkpoint before synchronizing: " +
@@ -329,6 +333,7 @@ export class GoogleSyncCoordinator {
           },
         };
         this.save(); // persist exact batch before executor journaling and external write
+        await this.durable();
       }
       const pending = this.binding.pending;
       if (pending) {
@@ -345,7 +350,9 @@ export class GoogleSyncCoordinator {
       if (
         !this.paused &&
         !this.disposed &&
-        this.engine.getSnapshot().status === "completed" &&
+        (this.engine.getSnapshot().status === "completed" ||
+          (checkpoint.snapshot.progress === 100 &&
+            checkpoint.events.at(-1)?.type === "verify")) &&
         this.binding.confirmedIndex === checkpoint.index
       ) {
         const verification = await this.adapter.verifyFinal(checkpoint.target);
@@ -366,6 +373,11 @@ export class GoogleSyncCoordinator {
       this.fail(error);
     } finally {
       this.busy = false;
+      try {
+        await this.durable();
+      } catch (error) {
+        this.fail(error);
+      }
       if (
         !this.paused &&
         !this.failed &&
@@ -382,6 +394,27 @@ export class GoogleSyncCoordinator {
         );
       }
     }
+  }
+  /** Drain one durable checkpoint without running the writing clock. Used by MV3 alarms. */
+  async synchronizeCheckpoint() {
+    if (this.busy || this.failed || this.disposed)
+      throw new Error("Reconcile synchronization before continuing.");
+    this.executor.resume();
+    this.paused = false;
+    try {
+      await this.flush();
+    } finally {
+      this.paused = true;
+      this.scheduler.cancel();
+    }
+    if (this.failed)
+      throw new Error(
+        "Synchronization needs attention. Reopen TypeFlow and reconcile.",
+      );
+    return (
+      this.binding.complete === true ||
+      this.binding.confirmedIndex === this.engine.getOutputProgress().index
+    );
   }
   dispose() {
     this.executor.stop();

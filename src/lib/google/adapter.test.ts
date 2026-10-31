@@ -384,3 +384,163 @@ it("explains final whitespace, punctuation, missing/extra content and paragraph-
   expect(compareFinalText("a", "abc").explanation).toContain("missing");
   expect(compareFinalText("abcabc", "abc").explanation).toContain("duplicated");
 });
+
+function checkpointHost(text: string) {
+  const plan = createPlan(text, { ...DEFAULT_SETTINGS, typos: "off" }, 1);
+  const snapshot = { ...IDLE_SNAPSHOT, status: "paused", text, progress: 100 };
+  return {
+    subscribe: () => () => {},
+    getSnapshot: () => snapshot,
+    getOutputProgress: () => ({
+      index: plan.events.length,
+      sessionId: "saved",
+    }),
+    getOutputCheckpoint: () => ({
+      sessionId: "saved",
+      index: plan.events.length,
+      events: plan.events,
+      target: plan.source,
+      snapshot,
+    }),
+    checkpoint: () => {},
+    pause: () => {},
+  } as unknown as SimulationEngine;
+}
+function memoryStorage() {
+  const values = new Map<string, string>();
+  return {
+    get length() {
+      return values.size;
+    },
+    key: (n: number) => [...values.keys()][n] ?? null,
+    getItem: (k: string) => values.get(k) ?? null,
+    setItem: (k: string, v: string) => {
+      values.set(k, v);
+    },
+    removeItem: (k: string) => {
+      values.delete(k);
+    },
+    clear: () => values.clear(),
+  } satisfies Storage;
+}
+it("drains a saved completed checkpoint while the writing clock stays paused", async () => {
+  const google = mockGoogle();
+  const host = checkpointHost("Saved 😀 checkpoint.");
+  const storage = memoryStorage();
+  let view: SyncView | undefined;
+  const durable = vi.fn(async () => {});
+  const sync = new GoogleSyncCoordinator(
+    host,
+    storage,
+    google,
+    newBinding("saved", "doc"),
+    (value) => {
+      view = value;
+    },
+    undefined,
+    30_000,
+    durable,
+  );
+  await sync.initialize();
+  expect(await sync.synchronizeCheckpoint()).toBe(true);
+  expect(host.getSnapshot().status).toBe("paused");
+  expect(loadBinding(storage, "saved")?.complete).toBe(true);
+  expect(view?.status).toBe("Complete · exact match verified");
+  expect(durable.mock.calls.length).toBeGreaterThan(3);
+  sync.dispose();
+});
+it("prevents all remote writes if the write-ahead journal cannot become durable", async () => {
+  const google = mockGoogle();
+  const storage = memoryStorage();
+  const durable = vi.fn(async () => {});
+  const sync = new GoogleSyncCoordinator(
+    checkpointHost("Must not write"),
+    storage,
+    google,
+    newBinding("saved", "doc"),
+    () => {},
+    undefined,
+    30_000,
+    durable,
+  );
+  await sync.initialize();
+  durable
+    .mockImplementationOnce(async () => {})
+    .mockImplementationOnce(async () => {})
+    .mockRejectedValueOnce(new Error("Disk failed"));
+  await expect(sync.synchronizeCheckpoint()).rejects.toThrow("attention");
+  expect(
+    google.request.mock.calls.filter(([action]) => action === "batch"),
+  ).toHaveLength(0);
+  expect(loadBinding(storage, "saved")?.pending).toBeDefined();
+  sync.dispose();
+});
+it("a recovered uncertain checkpoint confirms a committed write without submitting it again", async () => {
+  const google = mockGoogle();
+  let lost = true;
+  const transport: GoogleTransport = {
+    async request(action, body) {
+      const result = await google.request(action, body);
+      if (action === "batch" && lost) {
+        lost = false;
+        throw new Error("Lost acknowledgement");
+      }
+      return result;
+    },
+  };
+  const storage = memoryStorage();
+  const host = checkpointHost("Write this only once.");
+  const first = new GoogleSyncCoordinator(
+    host,
+    storage,
+    transport,
+    newBinding("saved", "doc"),
+    () => {},
+  );
+  await first.initialize();
+  await expect(first.synchronizeCheckpoint()).rejects.toThrow();
+  first.dispose();
+  const restored = new GoogleSyncCoordinator(
+    host,
+    storage,
+    transport,
+    loadBinding(storage, "saved")!,
+    () => {},
+  );
+  await restored.initialize();
+  await restored.synchronizeCheckpoint();
+  expect(
+    google.request.mock.calls.filter(([action]) => action === "batch"),
+  ).toHaveLength(1);
+  expect(loadBinding(storage, "saved")?.complete).toBe(true);
+  restored.dispose();
+});
+
+it("retries explicit quota rejection with bounded backoff and writes the approved text only once", async () => {
+  vi.useFakeTimers();
+  try {
+    const google = mockGoogle();
+    let attempts = 0;
+    const transport: GoogleTransport = {
+      async request(action, body) {
+        if (action === "batch" && ++attempts < 3)
+          throw new GoogleApiError("Quota", 429, 1000);
+        return google.request(action, body);
+      },
+    };
+    const adapter = new GoogleDocsOutputAdapter(transport, {
+      minWriteIntervalMs: 0,
+    });
+    await adapter.initialize({ documentId: "doc", text: "" });
+    const write = adapter.apply({ type: "insert", index: 0, text: "One copy" });
+    await vi.runAllTimersAsync();
+    await write;
+    expect(attempts).toBe(3);
+    expect(await adapter.readText()).toBe("One copy");
+    expect(
+      google.request.mock.calls.filter(([action]) => action === "batch"),
+    ).toHaveLength(1);
+  } finally {
+    vi.useRealTimers();
+  }
+});
