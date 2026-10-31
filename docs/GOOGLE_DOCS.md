@@ -1,6 +1,6 @@
-# Planned Google Docs integration
+# Google Docs integration design (historical)
 
-This release has **no Google OAuth or Docs API implementation**. No credentials are required. The contracts in `src/lib/integrations/google-docs.ts` define a future boundary; they are not a connected service.
+The original design below is retained for architectural context. **The current implementation is the MV3 extension**, with Chrome-managed OAuth, per-file document access, durable checkpoint synchronization and reconciliation. See [current setup and real-account acceptance](google-docs-setup.md) and [launch instructions](LAUNCH.md). Statements about unimplemented features below describe the earlier prototype, not the current release branch.
 
 ## Authorization and document creation
 

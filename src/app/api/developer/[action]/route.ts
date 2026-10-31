@@ -8,6 +8,8 @@ export async function POST(
   request: Request,
   context: { params: Promise<{ action: string }> },
 ) {
+  if (process.env.NODE_ENV !== "development")
+    return json({ error: "Not found." }, 404);
   try {
     checkOrigin(request, true);
     const { action } = await context.params;

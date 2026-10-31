@@ -273,6 +273,12 @@ export function Workspace() {
               </details>
             </section>
           ))}
+        <p className="restore-note">
+          Write directly in Google Docs with the{" "}
+          <Link href="/install">TypeFlow Chrome extension</Link>. This web
+          workspace provides a local preview.{" "}
+          <Link href="/help">Read the guide</Link>.
+        </p>
         <section className="settings-panel" aria-label="Output destination">
           <label className="advanced-field">
             Output
@@ -284,7 +290,9 @@ export function Workspace() {
               }
             >
               <option value="local">Local Preview</option>
-              <option value="google">Google Docs</option>
+              {process.env.NODE_ENV === "development" && (
+                <option value="google">Google Docs · local development</option>
+              )}
             </select>
           </label>
           {google.output === "google" && (
@@ -503,7 +511,7 @@ export function Workspace() {
                   <div className="panel-heading">
                     <h2>
                       <FileText size={15} />
-                      Type 2 · Final draft (optional)
+                      Type 2 · Final draft
                     </h2>
                   </div>
                   <label className="sr-only" htmlFor="final-text">
@@ -515,7 +523,7 @@ export function Workspace() {
                     maxLength={MAX_TEXT_LENGTH}
                     disabled={active || !loaded}
                     value={finalText}
-                    placeholder="Paste your final draft. Leave blank to simulate only Type 1."
+                    placeholder="Paste your final draft. An empty final draft removes the initial text."
                     onChange={(e) => {
                       engine.reset();
                       update({
@@ -586,8 +594,10 @@ export function Workspace() {
             <div className="privacy-note">
               <ShieldCheck size={15} />
               <p>
-                Your words stay right here. Drafts and preferences are stored in
-                this browser.
+                {google.output === "google"
+                  ? "Document content is sent to Google when you synchronize. Drafts and recovery checkpoints stay on this device."
+                  : "Your drafts and preferences stay in this browser."}{" "}
+                <Link href="/privacy">Privacy details</Link>
               </p>
             </div>
           </div>

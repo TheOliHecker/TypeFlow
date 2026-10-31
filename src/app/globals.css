@@ -2367,3 +2367,48 @@ textarea:disabled {
 .dev-shell del {
   color: #f3a1b6;
 }
+
+.product-page {
+  max-width: 780px;
+  margin: 0 auto;
+  padding: 64px 24px;
+  line-height: 1.8;
+}
+.product-page h1 {
+  font-family: Georgia, serif;
+  font-size: clamp(32px, 5vw, 48px);
+  line-height: 1.15;
+  margin: 16px 0 20px;
+  letter-spacing: -1.4px;
+}
+.product-page .product-intro {
+  font-size: 18px;
+  color: var(--muted);
+  margin-bottom: 40px;
+}
+.product-page section {
+  margin: 32px 0;
+}
+.product-page h2 {
+  font-size: 20px;
+  margin-bottom: 12px;
+}
+.product-page p {
+  margin: 12px 0;
+}
+.product-page ol {
+  padding-left: 24px;
+}
+.product-page li {
+  padding: 5px 0;
+}
+.product-page a:not(.button) {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.product-page footer {
+  padding-top: 28px;
+  margin-top: 40px;
+  border-top: 1px solid var(--line);
+}

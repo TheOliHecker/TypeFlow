@@ -18,6 +18,11 @@ export async function GET(
   request: Request,
   context: { params: Promise<{ action: string }> },
 ) {
+  if (process.env.NODE_ENV === "production")
+    return json(
+      { error: "Use the TypeFlow Chrome extension for Google Docs." },
+      404,
+    );
   const { action } = await context.params;
   try {
     if (action === "connect") return NextResponse.redirect(await authorize());
@@ -43,6 +48,11 @@ export async function POST(
   request: Request,
   context: { params: Promise<{ action: string }> },
 ) {
+  if (process.env.NODE_ENV === "production")
+    return json(
+      { error: "Use the TypeFlow Chrome extension for Google Docs." },
+      404,
+    );
   try {
     csrf(request);
     const { action } = await context.params;

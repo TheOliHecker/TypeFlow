@@ -1,5 +1,7 @@
 # Editing execution and local recovery
 
+The Chrome production host now lives in `extension/src/`, using the same engine, Google adapter, journal, and validated checkpoints with a single-owner Web Lock and a durable Chrome storage barrier. Alarms drain saved synchronization without running new writing. See [launch instructions](LAUNCH.md). The web lifecycle described below remains the local preview host.
+
 All writing is automated. Planned deadlines, actual execution timestamps, and confirmed synchronization times are distinct; recovery never invents historical edits.
 
 ## Lifecycle and ownership
